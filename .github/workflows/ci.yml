@@ -16,21 +16,23 @@ permissions:
 env:
   # Node 20 matches local dev. Note pnpm 11 requires Node >= 22.13, so this pin
   # and the packageManager pin in package.json move together or not at all.
+  # There is no PYTHON_VERSION here on purpose: uv resolves it from
+  # requires-python in apps/extractor/pyproject.toml, and a second pin would be
+  # one more thing to drift.
   NODE_VERSION: "20"
-  PYTHON_VERSION: "3.12"
 
 jobs:
   web:
     name: web + packages (Node)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # Reads the version from package.json#packageManager, so CI can never
       # drift from local.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -57,9 +59,9 @@ jobs:
       run:
         working-directory: apps/extractor
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
           cache-dependency-glob: apps/extractor/uv.lock
@@ -83,7 +85,7 @@ jobs:
     name: guardrails
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: No secrets committed
         run: |
