@@ -72,7 +72,11 @@ QUOTA_COST: Final[dict[str, int]] = {
 #   - a mix of channel sizes
 #   - a mix of description styles (full recipe in description vs. "link in bio")
 DEFAULT_VIDEOS: Final[list[tuple[str, str]]] = [
-    # (populated from the IDs you paste — see README of this script)
+    ("bUounn_Bmy4", "Your Food Lab — paneer butter masala"),
+    ("j3pDXY9fqSo", "aloo paratha"),
+    ("sAnPUIvPc1I", "unlabelled #3"),
+    ("cRsAQeR5dbI", "unlabelled #4"),
+    ("j6VlT_jUVPc", "James Hoffmann"),
 ]
 
 
@@ -188,7 +192,9 @@ class DescriptionAnalysis:
     nonempty_line_count: int
     quantity_line_count: int
     bullet_line_count: int
-    numbered_step_count: int
+    # Step-like lines by any shape: "1." markers, bullets, or prose under a
+    # method header. Counting only numbered steps under-reports badly.
+    step_line_count: int
     section_headers_found: list[str]
     recipe_line_share: float
     verdict: str
@@ -312,11 +318,14 @@ def _extract_error(response: httpx.Response) -> tuple[str | None, str | None]:
 # --------------------------------------------------------------------------
 
 _UNITS: Final = (
-    r"cups?|c\.|tbsps?|tablespoons?|tsps?|teaspoons?|g|grams?|kgs?|kilograms?|"
+    r"cups?|c\.|tbsps?|tablespoons?|tsps?|tsss?|teaspoons?|g|gms?|grams?|kgs?|kilograms?|"
     r"mls?|millilitres?|milliliters?|l|litres?|liters?|ozs?|ounces?|lbs?|pounds?|"
     r"cloves?|pinch(?:es)?|handfuls?|cans?|sticks?|slices?|pieces?|bunch(?:es)?|"
     r"sprigs?|dash(?:es)?|quarts?|pints?|gal(?:lons?)?|sachets?|packets?|"
-    r"knobs?|splash(?:es)?|drops?|bulbs?|heads?|stalks?|ribs?|fillets?|rashers?"
+    r"knobs?|splash(?:es)?|drops?|bulbs?|heads?|stalks?|ribs?|fillets?|rashers?|"
+    # Units that show up constantly in Indian recipe descriptions, which the
+    # first pass of this heuristic missed entirely.
+    r"nos?\.?|inch(?:es)?|katoris?|glass(?:es)?|medium(?:\s+sized)?|large|small"
 )
 
 # The "ambiguous" unicode below (en dash, curly quote, fraction glyphs) is
@@ -342,51 +351,147 @@ INGREDIENT_HEADER_RE: Final = re.compile(
     re.IGNORECASE,
 )
 METHOD_HEADER_RE: Final = re.compile(
-    r"^\W*(method|directions?|instructions?|steps?|recipe|how to make|preparation)\W*:?\s*$",
+    r"^\W*(method|directions?|instructions?|steps?|recipe|how to make|preparation|"
+    r"process|procedure)\W*:?\s*$",
     re.IGNORECASE,
 )
+
+# --- Quantity-last formats -------------------------------------------------
+# The first pass of this heuristic only matched a leading quantity and scored a
+# 36-ingredient description as "0 quantity lines". Creators overwhelmingly write
+# the ingredient first:
+#     Oil - 1 tbsp
+#     TOMATO | टमाटर 4 NOS.
+#     SALT | नमक TO TASTE
+#     Aloo - 3
+QTY_ANYWHERE_RE: Final = re.compile(rf"{_NUMBER}\s*(?:{_UNITS})\b", re.IGNORECASE | re.UNICODE)
+# Vague quantities are still quantities — the plan calls for qty_text: "to taste"
+# rather than an invented number, so these lines count as recoverable.
+VAGUE_QTY_RE: Final = re.compile(
+    r"\b(to taste|as required|as needed|as per taste|for garnish|for roasting|"
+    r"for frying|a pinch|to serve|taste hisab se)\b",
+    re.IGNORECASE,
+)
+# "Aloo - 3", "Capsicum - 2", "Beet - ½": separator then a bare number.
+TRAILING_BARE_QTY_RE: Final = re.compile(
+    rf"^.{{1,45}}?[-|:–—]\s*{_NUMBER}\s*\w{{0,12}}\.?\s*$", re.UNICODE  # noqa: RUF001
+)
+# Lines that look quantity-ish but are recipe metadata, not ingredients.
+METADATA_LINE_RE: Final = re.compile(
+    r"^\W*(prep(aration)?|cook(ing)?|total|rest(ing)?|proof(ing)?|chill)?\s*"
+    r"(time|serves?|servings?|yield|course|cuisine|difficulty|makes)\b",
+    re.IGNORECASE,
+)
+TIMESTAMP_RE: Final = re.compile(r"^\s*\d{1,2}:\d{2}")
+PARENTHETICAL_RE: Final = re.compile(r"\s*\([^)]*\)\s*$")
+
+
+def _is_noise(line: str) -> bool:
+    """Links, socials, hashtags, timestamps — never recipe content."""
+    lowered = line.lower()
+    return (
+        "http" in lowered
+        or lowered.startswith("#")
+        or bool(TIMESTAMP_RE.match(line))
+        or bool(METADATA_LINE_RE.match(line))
+    )
+
+
+def _is_ingredient_line(line: str) -> bool:
+    """Does this line carry an ingredient with some notion of quantity?
+
+    Handles quantity-first ("2 cups flour"), quantity-last ("Oil - 1 tbsp",
+    "TOMATO | टमाटर 4 NOS."), and vague quantities ("SALT | नमक TO TASTE"),
+    because all three are common and only the first was caught originally.
+    """
+    if _is_noise(line):
+        return False
+    body = BULLET_STRIP_RE.sub("", line).strip()
+    # A parenthetical is a note on the ingredient, not part of it. Stripping it
+    # before the length check keeps "11g coffee (a long aside about grind...)"
+    # from being discarded as prose.
+    body = PARENTHETICAL_RE.sub("", body).strip()
+    if not body or len(body) > 110:
+        return False
+    if QTY_LINE_RE.match(body) or BARE_QTY_LINE_RE.match(body):
+        return True
+    if QTY_ANYWHERE_RE.search(body):
+        return True
+    if TRAILING_BARE_QTY_RE.match(body):
+        return True
+    # "Water as required", "Ghee for roasting" — vague but real, and short
+    # enough not to be a sentence of prose.
+    return bool(VAGUE_QTY_RE.search(body)) and len(body) <= 60
+
+
+def _count_method_block(nonempty: list[str], headers_at: list[int]) -> int:
+    """Count instruction lines following a method header.
+
+    Many creators write steps as unnumbered prose or bullets, so counting only
+    "1." markers reports zero steps for a description with a complete method.
+    """
+    best = 0
+    for start in headers_at:
+        count = 0
+        for line in nonempty[start + 1 :]:
+            stripped = line.strip()
+            if _is_noise(stripped) or INGREDIENT_HEADER_RE.match(stripped):
+                break
+            body = BULLET_STRIP_RE.sub("", stripped).strip()
+            if len(body) > 20 and not _is_ingredient_line(stripped):
+                count += 1
+        best = max(best, count)
+    return best
 
 
 def analyse_description(video_id: str, description: str, dump: bool) -> DescriptionAnalysis:
     normalised = unicodedata.normalize("NFKC", description)
     lines = normalised.splitlines()
-    nonempty = [ln for ln in lines if ln.strip()]
+    nonempty = [ln.strip() for ln in lines if ln.strip()]
 
     qty_lines = 0
     bullets = 0
     numbered = 0
+    bullet_steps = 0
     headers: list[str] = []
+    method_header_indices: list[int] = []
 
-    for line in nonempty:
-        stripped = line.strip()
-        if QTY_LINE_RE.match(stripped) or BARE_QTY_LINE_RE.match(stripped):
+    for index, stripped in enumerate(nonempty):
+        if _is_ingredient_line(stripped):
             qty_lines += 1
-        # A leading bullet often precedes the quantity: "- 2 tbsp olive oil"
-        elif BULLET_RE.match(stripped):
-            body = BULLET_STRIP_RE.sub("", stripped)
-            if QTY_LINE_RE.match(body) or BARE_QTY_LINE_RE.match(body):
-                qty_lines += 1
         if BULLET_RE.match(stripped):
             bullets += 1
+            body = BULLET_STRIP_RE.sub("", stripped).strip()
+            if len(body) > 20 and not _is_noise(stripped) and not _is_ingredient_line(stripped):
+                bullet_steps += 1
         if NUMBERED_STEP_RE.match(stripped):
             numbered += 1
         if INGREDIENT_HEADER_RE.match(stripped):
             headers.append(f"INGREDIENTS::{stripped[:60]}")
         elif METHOD_HEADER_RE.match(stripped):
             headers.append(f"METHOD::{stripped[:60]}")
+            method_header_indices.append(index)
 
     has_ingredient_header = any(h.startswith("INGREDIENTS::") for h in headers)
-    has_method_header = any(h.startswith("METHOD::") for h in headers)
-    recipe_lines = qty_lines + numbered
+    has_method_header = bool(method_header_indices)
+
+    # Steps can present as numbers, bullets, or a prose block under a header.
+    # Take the strongest signal rather than insisting on one shape.
+    steps = max(numbered, bullet_steps, _count_method_block(nonempty, method_header_indices))
+
+    recipe_lines = qty_lines + steps
     share = recipe_lines / len(nonempty) if nonempty else 0.0
 
     # Deliberately conservative. Over-claiming here would be the single most
     # expensive mistake in this spike: it would justify skipping captions.
-    if qty_lines >= 4 and (numbered >= 3 or has_method_header):
+    # Ingredient-light, technique-heavy recipes are a real category — coffee,
+    # bread, cocktails. A ">= 4 ingredients" floor calls those PARTIAL forever,
+    # so a short ingredient list with a long method also qualifies.
+    if (qty_lines >= 4 and steps >= 3) or (qty_lines >= 2 and steps >= 5):
         verdict = "FULL_RECIPE"
     elif qty_lines >= 4 or (has_ingredient_header and qty_lines >= 2):
         verdict = "INGREDIENTS_ONLY"
-    elif qty_lines >= 1 or has_ingredient_header:
+    elif qty_lines >= 1 or has_ingredient_header or has_method_header:
         verdict = "PARTIAL"
     else:
         verdict = "NONE"
@@ -402,7 +507,7 @@ def analyse_description(video_id: str, description: str, dump: bool) -> Descript
         nonempty_line_count=len(nonempty),
         quantity_line_count=qty_lines,
         bullet_line_count=bullets,
-        numbered_step_count=numbered,
+        step_line_count=steps,
         section_headers_found=headers,
         recipe_line_share=round(share, 3),
         verdict=verdict,
@@ -547,7 +652,7 @@ def print_video_report(result: VideoResult, *, show_description: bool) -> None:
             f"{d.nonempty_line_count} non-blank lines"
         )
         print(f"       quantity-ish lines : {d.quantity_line_count}")
-        print(f"       numbered steps     : {d.numbered_step_count}")
+        print(f"       step-like lines    : {d.step_line_count}")
         print(f"       bullet lines       : {d.bullet_line_count}")
         print(f"       recipe line share  : {d.recipe_line_share:.0%}  (heuristic, not recall)")
         if d.section_headers_found:
@@ -672,6 +777,38 @@ def print_summary(results: list[VideoResult], quota_spent: int) -> None:
 # --------------------------------------------------------------------------
 
 
+def replay_q4() -> int:
+    """Re-analyse cached descriptions offline. Zero API calls, zero quota."""
+    cached = sorted(SPIKE_OUTPUT_DIR.glob("*.description.txt"))
+    if not cached:
+        _die(
+            f"No cached descriptions in {SPIKE_OUTPUT_DIR}.\n"
+            "  Run a live pass first: uv run scripts/spike_captions.py"
+        )
+        return 1
+
+    labels = dict(DEFAULT_VIDEOS)
+    print(RULE)
+    print("  Q4 REPLAY — cached descriptions, no API calls")
+    print(RULE)
+    tally: dict[str, int] = {}
+    for path in cached:
+        video_id = path.name.removesuffix(".description.txt")
+        analysis = analyse_description(video_id, path.read_text(encoding="utf-8"), dump=False)
+        tally[analysis.verdict] = tally.get(analysis.verdict, 0) + 1
+        print(
+            f"  {video_id:<12} {analysis.verdict:<17} "
+            f"qty={analysis.quantity_line_count:<3} steps={analysis.step_line_count:<3} "
+            f"share={analysis.recipe_line_share:>4.0%}   {labels.get(video_id, '')}"
+        )
+
+    print(f"\n  {'verdict':<18} count")
+    for verdict in ("FULL_RECIPE", "INGREDIENTS_ONLY", "PARTIAL", "NONE"):
+        print(f"  {verdict:<18} {tally.get(verdict, 0)}")
+    print(f"{RULE}\n")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Phase 2.1 captions reality check (throwaway spike).",
@@ -694,7 +831,19 @@ def main() -> int:
         action="store_true",
         help="Suppress the verbatim description dump in stdout (files are still written).",
     )
+    parser.add_argument(
+        "--replay-q4",
+        action="store_true",
+        help=(
+            "Re-run only the Q4 description analysis against descriptions already "
+            "cached in scripts/spike_output/. No API calls, no quota. Use this to "
+            "iterate on the heuristic — a full live run costs ~1,500 units."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.replay_q4:
+        return replay_q4()
 
     videos: list[tuple[str, str]]
     if args.video_ids:

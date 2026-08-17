@@ -62,12 +62,26 @@ if extraction is unreliable.
 Populated by `scripts/spike_captions.py`; see
 `docs/adr/0001-content-sourcing.md`.
 
-| Metric | Current |
-| --- | --- |
-| Videos where `captions.list` returns ≥1 track | — |
-| Videos where `captions.download` succeeds without owner OAuth | — |
-| Descriptions carrying a usable ingredient list | — |
-| Creators opted in | 0 |
+| Metric | Current | n |
+| --- | --- | --- |
+| `captions.list` succeeds with an API key | 5/5 | 5 |
+| Videos listing ≥1 caption track | 4/5 | 5 |
+| Caption tracks downloadable without owner OAuth | **0/6** (all `401 required`) | 6 tracks |
+| Descriptions carrying a complete recipe | 3/5 | 5 |
+| Descriptions carrying a usable ingredient list | 4/5 | 5 |
+| `contentDetails.caption` agreeing with `captions.list` | 4/5 | 5 |
+| Creators opted in | 0 | — |
+
+n=5 across 5 creators, skewed toward Indian home-cooking channels. Direction is
+trustworthy; the percentages are not. Re-measure on the Phase 2.2 50-video set.
+
+## Quota
+
+| Call | Units | Videos/day at the 10,000-unit default |
+| --- | --- | --- |
+| `videos.list` | 1 | 10,000 |
+| `captions.list` | 50 | 200 |
+| `captions.download` | 200 | 50 |
 
 ---
 
@@ -76,3 +90,4 @@ Populated by `scripts/spike_captions.py`; see
 | Date | Note |
 | --- | --- |
 | 2026-08-17 | File created. Phase 0 scaffold complete; nothing measured yet. |
+| 2026-08-17 | Phase 2.1 spike run. Captions unreachable without OAuth (401, not the predicted 403); descriptions carry more than expected. See `docs/adr/0001-content-sourcing.md`. |
