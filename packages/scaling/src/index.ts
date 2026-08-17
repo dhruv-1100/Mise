@@ -3,9 +3,22 @@
  *
  * Non-negotiable (see CLAUDE.md): this package stays dependency-free and
  * deterministic. No I/O, no clock, no randomness — every input maps to exactly
- * one output, forever. That is what makes 100% branch coverage and
- * property-based testing tractable here.
- *
- * Implementation lands in Phase 3.
+ * one output, forever. `@mise/schema` appears only as a devDependency and only
+ * ever as `import type`, which `verbatimModuleSyntax` erases at compile time,
+ * so nothing it depends on reaches the runtime.
  */
-export const PACKAGE_NAME = "@mise/scaling" as const;
+
+export { formatQuantity } from "./format.js";
+export { scale } from "./scale.js";
+export { classify, isBakingRecipe, isEgg } from "./taxonomy.js";
+export type {
+  AdvisoryCode,
+  ScaledIngredient,
+  ScaledRecipe,
+  ScaleFailure,
+  ScaleResult,
+  ScalingAdvisory,
+  ScalingClass,
+  ScalingWarning,
+  ScalingWarningCode,
+} from "./types.js";
