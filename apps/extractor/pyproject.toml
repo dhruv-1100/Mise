@@ -1,0 +1,59 @@
+[project]
+name = "mise-extractor"
+version = "0.0.0"
+description = "Mise extraction service. Owns all LLM calls, caption fetching, and recipe parsing."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic>=2.9",
+    "uvicorn>=0.32",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.28",  # required by fastapi.testclient.TestClient
+    "ruff>=0.8",
+]
+
+[tool.uv]
+# This is an application, not a distributable library — nothing to build or
+# install, so uv should not look for a build backend.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers --strict-config"
+filterwarnings = [
+    "error",
+    # TODO(phase-1): migrate the test client off httpx onto httpx2.
+    # Starlette 1.6 deprecated httpx inside TestClient. Downgraded to a visible
+    # warning rather than silenced, so it stays a standing TODO instead of
+    # disappearing. This is the only permitted exception to warnings-as-errors.
+    "default::starlette.exceptions.StarletteDeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors — includes E722, the bare-except ban
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "UP",     # pyupgrade
+    "SIM",    # flake8-simplify
+    "ASYNC",  # flake8-async
+    "RUF",    # ruff-specific
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.lint.per-file-ignores]
+# Asserts are the entire point of a test file.
+"tests/**" = ["S101"]

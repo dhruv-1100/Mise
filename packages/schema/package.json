@@ -1,0 +1,17 @@
+{
+  "name": "@mise/schema",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared types and protobuf definitions crossing the web/extractor boundary.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

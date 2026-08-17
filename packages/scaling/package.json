@@ -1,0 +1,17 @@
+{
+  "name": "@mise/scaling",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure, dependency-free recipe scaling engine. Zero runtime dependencies, by design.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

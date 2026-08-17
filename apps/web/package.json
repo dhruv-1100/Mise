@@ -1,0 +1,31 @@
+{
+  "name": "@mise/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "node -e \"console.log('[@mise/web] no tests yet — Playwright cook-mode specs land in Phase 6')\""
+  },
+  "dependencies": {
+    "@mise/scaling": "workspace:*",
+    "@mise/schema": "workspace:*",
+    "next": "15.5.23",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@tailwindcss/postcss": "^4.1.16",
+    "@types/node": "^20.19.9",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "15.5.23",
+    "tailwindcss": "^4.1.16",
+    "typescript": "^5.9.3"
+  }
+}
