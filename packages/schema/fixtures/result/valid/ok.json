@@ -1,0 +1,30 @@
+{
+  "status": "ok",
+  "recipe": {
+    "videoId": "aaaaaaaaaaa",
+    "title": "Weeknight Tomato Pasta",
+    "creator": {
+      "name": "Example Kitchen",
+      "channelId": "UCexampleexampleexample",
+      "channelUrl": "https://www.youtube.com/channel/UCexampleexampleexample"
+    },
+    "ingredients": [
+      {
+        "name": "dried spaghetti",
+        "qty": 400,
+        "qtyText": null,
+        "unit": "g",
+        "prep": null,
+        "optional": false,
+        "source": "description",
+        "confidence": 1
+      }
+    ],
+    "steps": [],
+    "yield": { "qty": 4, "qtyText": null, "unit": "serving" },
+    "equipment": [],
+    "sources": ["description"],
+    "conflicts": [],
+    "extractedAt": "2026-08-17T19:41:09Z"
+  }
+}

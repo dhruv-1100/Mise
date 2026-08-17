@@ -1,0 +1,52 @@
+{
+  "videoId": "ddddddddddd",
+  "title": "Skillet Cornbread",
+  "creator": {
+    "name": "Example Kitchen",
+    "channelId": "UCexampleexampleexample",
+    "channelUrl": "https://www.youtube.com/channel/UCexampleexampleexample"
+  },
+  "ingredients": [
+    {
+      "name": "buttermilk",
+      "qty": 2,
+      "qtyText": null,
+      "unit": "cup",
+      "prep": null,
+      "optional": false,
+      "source": "description",
+      "confidence": 0.7
+    }
+  ],
+  "steps": [
+    {
+      "index": 1,
+      "text": "Heat the skillet in the oven until it smokes faintly.",
+      "durationS": 600,
+      "tempC": 220,
+      "source": "caption"
+    }
+  ],
+  "yield": {
+    "qty": 8,
+    "qtyText": null,
+    "unit": "serving"
+  },
+  "equipment": [
+    "cast-iron skillet"
+  ],
+  "sources": [
+    "description",
+    "caption"
+  ],
+  "conflicts": [
+    {
+      "field": "ingredients.0.qty",
+      "description": "2 cups",
+      "caption": "three cups",
+      "chosen": "description",
+      "reason": "Description wins for quantities; the creator misspoke or rounded aloud."
+    }
+  ],
+  "extractedAt": "2026-08-17T19:41:09Z"
+}

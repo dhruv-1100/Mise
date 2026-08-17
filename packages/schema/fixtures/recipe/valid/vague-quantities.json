@@ -1,0 +1,55 @@
+{
+  "videoId": "bbbbbbbbbbb",
+  "title": "Braised Greens",
+  "creator": {
+    "name": "Example Kitchen",
+    "channelId": "UCexampleexampleexample",
+    "channelUrl": "https://www.youtube.com/channel/UCexampleexampleexample"
+  },
+  "ingredients": [
+    {
+      "name": "olive oil",
+      "qty": null,
+      "qtyText": "a good glug",
+      "unit": null,
+      "prep": null,
+      "optional": false,
+      "source": "description",
+      "confidence": 0.9
+    },
+    {
+      "name": "salt",
+      "qty": null,
+      "qtyText": "to taste",
+      "unit": null,
+      "prep": null,
+      "optional": false,
+      "source": "description",
+      "confidence": 1
+    },
+    {
+      "name": "greens",
+      "qty": null,
+      "qtyText": "two big handfuls",
+      "unit": null,
+      "prep": "washed",
+      "optional": false,
+      "source": "description",
+      "confidence": 0.8
+    }
+  ],
+  "steps": [
+    {
+      "index": 1,
+      "text": "Wilt the greens in the oil, then season.",
+      "durationS": null,
+      "tempC": null,
+      "source": "description"
+    }
+  ],
+  "yield": { "qty": null, "qtyText": "serves a few", "unit": "serving" },
+  "equipment": [],
+  "sources": ["description"],
+  "conflicts": [],
+  "extractedAt": "2026-08-17T19:41:09Z"
+}

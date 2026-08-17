@@ -1,0 +1,6 @@
+{
+  "status": "insufficient_source_material",
+  "videoId": "eeeeeeeeeee",
+  "reason": "description_is_link_only",
+  "sourcesTried": ["description", "caption"]
+}

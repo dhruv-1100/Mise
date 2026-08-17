@@ -1,0 +1,78 @@
+{
+  "videoId": "aaaaaaaaaaa",
+  "title": "Weeknight Tomato Pasta",
+  "creator": {
+    "name": "Example Kitchen",
+    "channelId": "UCexampleexampleexample",
+    "channelUrl": "https://www.youtube.com/channel/UCexampleexampleexample"
+  },
+  "ingredients": [
+    {
+      "name": "dried spaghetti",
+      "qty": 400,
+      "qtyText": null,
+      "unit": "g",
+      "prep": null,
+      "optional": false,
+      "source": "description",
+      "confidence": 1
+    },
+    {
+      "name": "garlic",
+      "qty": 4,
+      "qtyText": null,
+      "unit": "clove",
+      "prep": "thinly sliced",
+      "optional": false,
+      "source": "description",
+      "confidence": 1
+    },
+    {
+      "name": "chilli flakes",
+      "qty": null,
+      "qtyText": null,
+      "unit": null,
+      "prep": null,
+      "optional": true,
+      "source": "description",
+      "confidence": 0.6
+    }
+  ],
+  "steps": [
+    {
+      "index": 1,
+      "text": "Bring a large pot of salted water to the boil.",
+      "durationS": null,
+      "tempC": null,
+      "source": "description"
+    },
+    {
+      "index": 2,
+      "text": "Warm the oil in a wide pan and add the garlic.",
+      "durationS": 120,
+      "tempC": null,
+      "source": "description"
+    },
+    {
+      "index": 5,
+      "text": "Add the tomatoes and simmer.",
+      "durationS": 900,
+      "tempC": 95,
+      "source": "description"
+    }
+  ],
+  "yield": {
+    "qty": 4,
+    "qtyText": null,
+    "unit": "serving"
+  },
+  "equipment": [
+    "large pot",
+    "12-inch skillet"
+  ],
+  "sources": [
+    "description"
+  ],
+  "conflicts": [],
+  "extractedAt": "2026-08-17T19:41:09Z"
+}

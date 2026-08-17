@@ -1,0 +1,39 @@
+{
+  "videoId": "ccccccccccc",
+  "title": "Street-Style Vegetable Mash",
+  "creator": {
+    "name": "Example Kitchen",
+    "channelId": "UCexampleexampleexample",
+    "channelUrl": "https://www.youtube.com/channel/UCexampleexampleexample"
+  },
+  "ingredients": [
+    {
+      "name": "butter",
+      "qty": 2,
+      "qtyText": null,
+      "unit": "tbsp",
+      "prep": null,
+      "optional": false,
+      "source": "description",
+      "confidence": 1
+    },
+    {
+      "name": "potatoes",
+      "qty": 3,
+      "qtyText": null,
+      "unit": null,
+      "prep": "boiled",
+      "optional": false,
+      "source": "description",
+      "confidence": 0.9
+    }
+  ],
+  "steps": [],
+  "yield": null,
+  "equipment": [],
+  "sources": [
+    "description"
+  ],
+  "conflicts": [],
+  "extractedAt": "2026-08-17T19:41:09Z"
+}

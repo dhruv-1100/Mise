@@ -17,8 +17,11 @@ never been applied. See `BUILD_PLAN.md` for all 12 phases.
   and parsing. The web app never calls an LLM directly.
 - `packages/scaling` — pure TypeScript, zero runtime deps, 100% branch coverage
   required (enforced from Phase 3).
-- `packages/schema` — shared types; `extractor.proto` and generated TS/Python
-  stubs arrive in Phase 4.
+- `packages/schema` — the recipe contract, as zod schemas with inferred types.
+  Mirrored by hand in `apps/extractor/app/schema.py` (Pydantic); both are
+  validated against the shared fixtures in `packages/schema/fixtures/`, which is
+  what stops the two definitions drifting. `extractor.proto` and generated
+  TS/Python stubs replace the mirror in Phase 4.
 - `infra/` — Terraform (Phase 1).
 - Postgres (Neon) with pgvector, Redis (Upstash) for cache + job queue — both
   Phase 1. Neither exists yet.
@@ -80,6 +83,10 @@ terraform -chdir=infra plan                # needs TF_VAR_* creds; see infra/REA
 
 - `packages/scaling` — property-based tests via fast-check. Required. Write the
   tests first; this is the one component where correctness beats speed.
+- **Changing the recipe contract** means adding a fixture to
+  `packages/schema/fixtures/`, watching both suites fail, then changing both
+  `packages/schema/src/recipe.ts` and `apps/extractor/app/schema.py`. Never one
+  without the other.
 - `apps/extractor` — pytest with golden-file fixtures in `tests/fixtures/`.
   Warnings are errors (`filterwarnings = ["error", ...]`); the single documented
   exception is the Starlette/httpx2 TestClient deprecation.
