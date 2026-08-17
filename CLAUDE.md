@@ -4,8 +4,11 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phase 0 complete (scaffold). Phase 2.1 (captions spike) in progress.
-Phase 1 (Terraform + CI) not started. See `BUILD_PLAN.md` for all 12 phases.
+**Status:** Phase 0 complete. Phase 2.1 complete — see
+`docs/adr/0001-content-sourcing.md`; the headline is that captions are
+unreachable without creator OAuth and descriptions are the primary source.
+Phase 1 in progress: CI is written, Terraform is written and validates but has
+never been applied. See `BUILD_PLAN.md` for all 12 phases.
 
 ## Architecture
 
@@ -66,7 +69,11 @@ uv run uvicorn app.main:app --reload   # :8000
 
 ```bash
 uv run scripts/spike_captions.py ID1 ID2   # Phase 2.1 spike (self-contained)
-terraform -chdir=infra plan                # Phase 1, not yet present
+uv run scripts/spike_captions.py --replay-q4  # re-analyse cached text, 0 quota
+
+terraform -chdir=infra init
+terraform -chdir=infra validate
+terraform -chdir=infra plan                # needs TF_VAR_* creds; see infra/README.md
 ```
 
 ## Testing
