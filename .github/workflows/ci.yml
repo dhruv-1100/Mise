@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A superseded run tells you nothing. Cancel it and save the minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Node 20 matches local dev. Note pnpm 11 requires Node >= 22.13, so this pin
+  # and the packageManager pin in package.json move together or not at all.
+  # There is no PYTHON_VERSION here on purpose: uv resolves it from
+  # requires-python in apps/extractor/pyproject.toml, and a second pin would be
+  # one more thing to drift.
+  NODE_VERSION: "20"
+
+jobs:
+  web:
+    name: web + packages (Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Reads the version from package.json#packageManager, so CI can never
+      # drift from local.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+  extractor:
+    name: extractor (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/extractor
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+          cache-dependency-glob: apps/extractor/uv.lock
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run --frozen ruff check
+
+      - name: Format check
+        run: uv run --frozen ruff format --check .
+
+      - name: Test
+        run: uv run --frozen pytest
+
+  terraform:
+    name: infra (Terraform)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.15.8"
+
+      - name: Format
+        run: terraform fmt -check -recursive
+
+      # -backend=false: validate needs the provider schemas, not state, and
+      # there are no credentials here. plan and apply stay manual until there
+      # is a remote backend that can lock.
+      - name: Init
+        run: terraform init -backend=false -input=false
+
+      - name: Validate
+        run: terraform validate -no-color
+
+  # A cheap, specific check that the project's central rule is actually true,
+  # rather than merely written down in CLAUDE.md. Costs seconds; catches the
+  # one mistake that would matter legally.
+  guardrails:
+    name: guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: No secrets committed
+        run: |
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "::error::.env is tracked. It must never be committed."
+            exit 1
+          fi
+          if git grep -InE 'AIza[0-9A-Za-z_-]{35}' -- . ':!*.example' ':!.github/*'; then
+            echo "::error::A Google API key appears to be committed."
+            exit 1
+          fi
+          echo "OK: no .env, no API keys in tree"
+
+      - name: No raw transcript output committed
+        run: |
+          if git ls-files | grep -q '^scripts/spike_output/'; then
+            echo "::error::scripts/spike_output/ is tracked. Raw fetched text must stay out of git."
+            exit 1
+          fi
+          echo "OK: spike_output/ untracked"
+
+      - name: No transcript scrapers in dependencies
+        run: |
+          # ADR 0001: official YouTube Data API only. If the API cannot do
+          # something, that is a finding, not a thing to route around.
+          #
+          # Matches declarations and imports, never prose — the rule is written
+          # out in several docs and in the spike's own docstring, and a check
+          # that trips on its own documentation gets disabled within a week.
+          # Note: no \b anywhere. git grep -E is POSIX ERE, where \b is not a
+          # word boundary and the pattern silently never matches.
+          FOUND=0
+
+          if git grep -InE '(yt[-_]dlp|youtube[-_]dl|youtube[-_]transcript[-_]api|pytube|ytdl[-_]core)' \
+               -- '*pyproject.toml' '*requirements*.txt' '*uv.lock' \
+                  '*package.json' '*pnpm-lock.yaml'; then
+            echo "::error::A transcript scraper appears in a dependency manifest."
+            FOUND=1
+          fi
+
+          if git grep -InE '^[[:space:]]*(import|from)[[:space:]]+(yt_dlp|youtube_dl|youtube_transcript_api|pytube)' \
+               -- '*.py'; then
+            echo "::error::A transcript scraper is imported in Python source."
+            FOUND=1
+          fi
+
+          if git grep -InE "(require\(|from[[:space:]]+)['\"](ytdl-core|yt-dlp|youtube-dl)" \
+               -- '*.ts' '*.tsx' '*.js' '*.mjs'; then
+            echo "::error::A transcript scraper is imported in TypeScript/JavaScript source."
+            FOUND=1
+          fi
+
+          if [ "$FOUND" -ne 0 ]; then
+            echo "::error::See docs/adr/0001-content-sourcing.md."
+            exit 1
+          fi
+          echo "OK: no scrapers declared or imported"

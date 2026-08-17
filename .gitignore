@@ -33,13 +33,15 @@ venv/
 .mypy_cache/
 *.egg-info/
 
-# --- Terraform (Phase 1) ---------------------------------------------------
+# --- Terraform -------------------------------------------------------------
 .terraform/
 *.tfstate
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
-.terraform.lock.hcl
+# NOTE: .terraform.lock.hcl is deliberately NOT ignored. It pins provider
+# versions and hashes the same way pnpm-lock.yaml does, and Terraform expects
+# it in version control.
 
 # --- Editors / OS ----------------------------------------------------------
 .DS_Store
