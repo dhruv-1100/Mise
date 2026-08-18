@@ -57,3 +57,9 @@ known-first-party = ["app"]
 [tool.ruff.lint.per-file-ignores]
 # Asserts are the entire point of a test file.
 "tests/**" = ["S101"]
+# RUF001/002/003 flag characters that look like ASCII lookalikes. Normalizing
+# exactly those characters — styled unicode, fraction glyphs, U+2044 FRACTION
+# SLASH — is what this module does and what its tests exercise, so the lookalikes
+# are the subject matter rather than a mistake.
+"app/normalize.py" = ["RUF001", "RUF002", "RUF003"]
+"tests/test_normalize.py" = ["S101", "RUF001", "RUF002", "RUF003"]
