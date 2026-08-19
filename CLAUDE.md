@@ -4,10 +4,10 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phases 0, 2.1 and 3 complete. Phase 2.3 runs end to end
-(normalize -> LLM extract -> units) on Gemini; entity resolution and the
-sanity-rule validator are still open, and there is no accuracy number until the
-Phase 2.2 labelled set exists. Phase 1 in progress: CI is written,
+**Status:** Phases 0, 2.1 and 3 complete. Phase 2.3 works from a real YouTube
+URL: fetch -> normalize -> extract -> units, exposed as `POST /extract`. Entity
+resolution and the sanity-rule validator are still open, and there is no
+accuracy number until the Phase 2.2 labelled set exists. Phase 1 in progress: CI is written,
 Terraform is written and validates but has never been applied. The headline
 finding so far is `docs/adr/0001-content-sourcing.md` — captions are unreachable
 without creator OAuth, so descriptions are the primary source. See
@@ -80,7 +80,10 @@ uv sync                 # once
 uv run pytest
 uv run ruff check
 uv run ruff format
-uv run uvicorn app.main:app --reload   # :8000
+uv run uvicorn app.main:app --reload   # :8000, needs YOUTUBE_API_KEY + GEMINI_API_KEY
+
+# curl -X POST localhost:8000/extract -H 'Content-Type: application/json' \
+#   -d '{"video":"https://youtu.be/VIDEO_ID"}'
 ```
 
 ```bash
