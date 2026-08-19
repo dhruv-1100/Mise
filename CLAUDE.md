@@ -4,8 +4,10 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phases 0, 2.1 and 3 complete; Phase 2.3 partly done (normalize and
-unit canonicalisation; the LLM stage is blocked on an API key). Phase 1 in progress: CI is written,
+**Status:** Phases 0, 2.1 and 3 complete. Phase 2.3 runs end to end
+(normalize -> LLM extract -> units) on Gemini; entity resolution and the
+sanity-rule validator are still open, and there is no accuracy number until the
+Phase 2.2 labelled set exists. Phase 1 in progress: CI is written,
 Terraform is written and validates but has never been applied. The headline
 finding so far is `docs/adr/0001-content-sourcing.md` — captions are unreachable
 without creator OAuth, so descriptions are the primary source. See
@@ -16,8 +18,11 @@ without creator OAuth, so descriptions are the primary source. See
 - `apps/web` — Next.js 15 App Router, TypeScript, Tailwind 4. BFF pattern.
 - `apps/extractor` — Python 3.12 + FastAPI, managed by uv. Owns all LLM calls
   and parsing. The web app never calls an LLM directly. Pipeline stages are pure
-  functions in `app/`: `normalize.py` (strip description noise), `units.py`
-  (canonical grams/ml). The LLM stage and entity resolution are not built yet.
+  functions in `app/`: `normalize.py` (strip description noise), `extract.py`
+  (LLM extraction and mapping onto the contract), `units.py` (canonical
+  grams/ml). All LLM access goes through the `LlmProvider` protocol in
+  `app/llm.py` — nothing else imports the SDK, and tests use `FakeProvider` so
+  they run offline. Entity resolution is not built yet.
 - `packages/scaling` — pure TypeScript, zero runtime deps, 100% branch coverage
   enforced (`pnpm test` fails below it, so CI fails below it). `@mise/schema` is
   a devDependency consumed only via `import type`, which is erased at compile
@@ -81,6 +86,7 @@ uv run uvicorn app.main:app --reload   # :8000
 ```bash
 uv run scripts/spike_captions.py ID1 ID2   # Phase 2.1 spike (self-contained)
 uv run scripts/spike_captions.py --replay-q4  # re-analyse cached text, 0 quota
+# Extraction needs GEMINI_API_KEY in .env — see docs/adr/0002-llm-provider.md
 
 terraform -chdir=infra init
 terraform -chdir=infra validate
@@ -131,3 +137,6 @@ terraform -chdir=infra plan                # needs TF_VAR_* creds; see infra/REA
   drop its `FlatCompat` shim.
 - **Node 20 is EOL.** Next 15 supports it, but Phase 1 should move to Node 22
   LTS before CI is pinned to a version.
+- **Gemini, not Anthropic.** The plan named no vendor and the first
+  `.env.example` guessed Anthropic. See `docs/adr/0002-llm-provider.md`; the
+  provider sits behind `LlmProvider`, so swapping is one new class.

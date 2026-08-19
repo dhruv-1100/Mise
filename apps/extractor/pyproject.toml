@@ -5,6 +5,7 @@ description = "Mise extraction service. Owns all LLM calls, caption fetching, an
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115",
+    "google-genai>=1.0",
     "pydantic>=2.9",
     "uvicorn>=0.32",
 ]
@@ -62,4 +63,5 @@ known-first-party = ["app"]
 # SLASH — is what this module does and what its tests exercise, so the lookalikes
 # are the subject matter rather than a mistake.
 "app/normalize.py" = ["RUF001", "RUF002", "RUF003"]
+"app/extract.py" = ["RUF001", "RUF002", "RUF003"]
 "tests/test_normalize.py" = ["S101", "RUF001", "RUF002", "RUF003"]
