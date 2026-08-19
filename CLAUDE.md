@@ -4,7 +4,8 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phases 0, 2.1, and 3 complete. Phase 1 in progress: CI is written,
+**Status:** Phases 0, 2.1 and 3 complete; Phase 2.3 partly done (normalize and
+unit canonicalisation; the LLM stage is blocked on an API key). Phase 1 in progress: CI is written,
 Terraform is written and validates but has never been applied. The headline
 finding so far is `docs/adr/0001-content-sourcing.md` — captions are unreachable
 without creator OAuth, so descriptions are the primary source. See
@@ -14,7 +15,9 @@ without creator OAuth, so descriptions are the primary source. See
 
 - `apps/web` — Next.js 15 App Router, TypeScript, Tailwind 4. BFF pattern.
 - `apps/extractor` — Python 3.12 + FastAPI, managed by uv. Owns all LLM calls
-  and parsing. The web app never calls an LLM directly.
+  and parsing. The web app never calls an LLM directly. Pipeline stages are pure
+  functions in `app/`: `normalize.py` (strip description noise), `units.py`
+  (canonical grams/ml). The LLM stage and entity resolution are not built yet.
 - `packages/scaling` — pure TypeScript, zero runtime deps, 100% branch coverage
   enforced (`pnpm test` fails below it, so CI fails below it). `@mise/schema` is
   a devDependency consumed only via `import type`, which is erased at compile
@@ -94,7 +97,11 @@ terraform -chdir=infra plan                # needs TF_VAR_* creds; see infra/REA
   without the other.
 - `apps/extractor` — pytest with golden-file fixtures in `tests/fixtures/`.
   Warnings are errors (`filterwarnings = ["error", ...]`); the single documented
-  exception is the Starlette/httpx2 TestClient deprecation.
+  exception is the Starlette/httpx2 TestClient deprecation. Pipeline stages get
+  synthetic fixtures in tests, then a manual run against the real cached
+  descriptions in `scripts/spike_output/` as a sanity check — that second step
+  is what caught the NFKC fraction bug and confirmed zero ingredient lines were
+  being dropped.
 - `apps/web` — Playwright for cook-mode flows only. Don't unit test React.
   `pnpm test` is a documented no-op in `apps/web` until Phase 6.
 
