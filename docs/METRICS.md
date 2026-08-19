@@ -51,7 +51,7 @@ if extraction is unreliable.
 
 | Metric | Current |
 | --- | --- |
-| Cost per month | $0 (nothing provisioned) |
+| Cost per month | $0 (Neon free tier; nothing else provisioned) |
 | Queue depth (p95) | — |
 | Error rate | — |
 | Cache hit rate | — |

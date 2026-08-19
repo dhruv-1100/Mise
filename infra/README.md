@@ -3,10 +3,30 @@
 Terraform for Neon (Postgres), Upstash (Redis), Vercel (web), Railway
 (extractor), and Grafana Cloud (metrics).
 
-**Status: written and `terraform validate`-clean, never applied.** No account
-exists for Neon yet, and nothing here has been run against a real API. Expect
-the first `plan` to surface things `validate` cannot see — region slugs, plan
-eligibility, name collisions.
+**Status: Neon is applied and live. The other four providers are not.**
+
+Neon was applied on 2026-08-19: project `mise-prod` (`curly-recipe-02809405`),
+database `mise`, role `mise_app`, PostgreSQL 17.10, pgvector 0.8.0.
+
+Upstash, Vercel, Railway and Grafana are written and `validate`-clean but have
+never been applied, because no credentials exist for them yet. Until they do,
+apply with `-target` on the Neon resources; an untargeted `plan` will try to
+reach the other four providers and fail on placeholder tokens.
+
+Two things the first real apply surfaced that neither `validate` nor `plan`
+could see, both now fixed:
+
+- **`history_retention_seconds` was 86400.** The free tier caps it at **21600**
+  (6 hours) and the API returns a 400 above that. Quotas are server-side; schema
+  validation cannot know them.
+- **Organization API keys need an explicit `org_id`.** A personal key does not.
+  If `/users/me` and `/regions` return 401 while `/projects` works, the key is
+  an organization key. Get the id with:
+
+  ```bash
+  curl -H "Authorization: Bearer $NEON_API_KEY" \
+    https://console.neon.tech/api/v2/users/me/organizations
+  ```
 
 ## Usage
 
@@ -51,14 +71,15 @@ has no `extensions` attribute. `BUILD_PLAN.md` §1.1 asks for "a Neon Postgres
 project with pgvector enabled"; the first half is Terraform's job and the
 second half is not.
 
-pgvector gets enabled in SQL, in the first migration:
+pgvector gets enabled in SQL, in the first migration — which is written and has
+been applied:
 
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
+```bash
+psql "$(terraform -chdir=infra output -raw database_url)" \
+  -f apps/extractor/migrations/0001_enable_pgvector.sql
 ```
 
-Phase 10 is the first thing that needs it. Run it in Phase 6 anyway, so the
-extension is in place long before anything depends on it.
+Confirmed live: `vector` 0.8.0.
 
 ### Two of the five providers are not official
 
@@ -76,6 +97,17 @@ minor versions, which is why `versions.tf` pins with `~>` and
 in an interview, be ready for "which providers?" — the honest answer is that
 two of the five are community-maintained, and knowing that is a better signal
 than not.
+
+### `database_url` is the app role, not the project owner
+
+`neon_project.connection_uri` points at the project's **default** database and
+owner role (`neondb` / `neondb_owner`), not the ones declared in `neon.tf`.
+Using it would mean the application connects to the wrong database as a
+high-privilege role, which defeats creating a least-privilege role at all.
+
+The `database_url` and `database_url_pooled` outputs build the real connection
+string for `mise_app` against `mise`. `owner_database_url` exposes the owner
+credential for migrations and admin, and should never reach the application.
 
 ### State is local
 
