@@ -26,5 +26,5 @@ github_repo  = "dhruv-1100/Mise"
 # Phase 7 reports against an SLO.
 neon_region     = "aws-us-east-1"
 neon_pg_version = 17
-upstash_region  = "us-east-1"
+upstash_primary_region = "us-east-1"
 grafana_region  = "prod-us-east-0"

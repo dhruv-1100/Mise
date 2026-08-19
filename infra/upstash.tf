@@ -5,7 +5,13 @@
 
 resource "upstash_redis_database" "main" {
   database_name = local.name
-  region        = var.upstash_region
+
+  // "global" is now the only accepted value: Upstash deprecated regional
+  // database creation, and the API rejects a regional region with a 400. A
+  // global database is a primary region plus optional read replicas, so
+  // primary_region carries what region used to.
+  region         = "global"
+  primary_region = var.upstash_primary_region
 
   // TLS on. The extractor and the BFF reach this over the public internet.
   tls = true

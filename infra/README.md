@@ -3,22 +3,31 @@
 Terraform for Neon (Postgres), Upstash (Redis), Vercel (web), Railway
 (extractor), and Grafana Cloud (metrics).
 
-**Status: Neon is applied and live. The other four providers are not.**
+**Status: Neon, Upstash and Vercel are applied and live. Railway and Grafana
+are not.**
 
-Neon was applied on 2026-08-19: project `mise-prod` (`curly-recipe-02809405`),
-database `mise`, role `mise_app`, PostgreSQL 17.10, pgvector 0.8.0.
+| Provider | State | Detail |
+| --- | --- | --- |
+| Neon | live | `mise-prod` (`curly-recipe-02809405`), db `mise`, role `mise_app`, PG 17.10, pgvector 0.8.0 |
+| Upstash | live | global Redis, primary `us-east-1`, TLS, eviction off |
+| Vercel | live | project `mise-prod`, Next.js, root `apps/web`, linked to `dhruv-1100/Mise@main` |
+| Railway | not applied | no valid token yet |
+| Grafana | not applied | no token yet |
 
-Upstash, Vercel, Railway and Grafana are written and `validate`-clean but have
-never been applied, because no credentials exist for them yet. Until they do,
-apply with `-target` on the Neon resources; an untargeted `plan` will try to
-reach the other four providers and fail on placeholder tokens.
+Until the last two exist, apply with `-target`; an untargeted `plan` reaches
+every provider and fails on placeholder tokens.
 
-Two things the first real apply surfaced that neither `validate` nor `plan`
-could see, both now fixed:
+Three things the real applies surfaced that neither `validate` nor `plan` could
+see, all now fixed. The pattern is worth internalising: schema validation knows
+attribute names and types, and knows nothing about quotas, deprecations, or
+account state.
 
 - **`history_retention_seconds` was 86400.** The free tier caps it at **21600**
   (6 hours) and the API returns a 400 above that. Quotas are server-side; schema
   validation cannot know them.
+- **Upstash regional databases are deprecated.** `region` must now be
+  `"global"`, with the old value moving to `primary_region`; a regional value
+  returns a 400. A global database is one primary plus optional read replicas.
 - **Organization API keys need an explicit `org_id`.** A personal key does not.
   If `/users/me` and `/regions` return 401 while `/projects` works, the key is
   an organization key. Get the id with:

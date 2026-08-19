@@ -7,11 +7,12 @@ A web app that converts cooking videos into structured, scalable recipes.
 **Status:** Phases 0, 2.1 and 3 complete. Phase 2.3 works from a real YouTube
 URL: fetch -> normalize -> extract -> units, exposed as `POST /extract`. Entity
 resolution and the sanity-rule validator are still open, and there is no
-accuracy number until the Phase 2.2 labelled set exists. Phase 1 in progress: CI is written,
-Terraform is written and validates but has never been applied. The headline
-finding so far is `docs/adr/0001-content-sourcing.md` — captions are unreachable
-without creator OAuth, so descriptions are the primary source. See
-`BUILD_PLAN.md` for all 12 phases.
+accuracy number until the Phase 2.2 labelled set exists. Phase 1 nearly done: CI
+is green, and Neon, Upstash and Vercel are provisioned via Terraform; Railway and
+Grafana await credentials. The headline finding so far is
+`docs/adr/0001-content-sourcing.md` — captions are unreachable without creator
+OAuth, so descriptions are the primary source. See `BUILD_PLAN.md` for all 12
+phases.
 
 ## Architecture
 
@@ -32,10 +33,9 @@ without creator OAuth, so descriptions are the primary source. See
   validated against the shared fixtures in `packages/schema/fixtures/`, which is
   what stops the two definitions drifting. `extractor.proto` and generated
   TS/Python stubs replace the mirror in Phase 4.
-- `infra/` — Terraform (Phase 1). Neon is applied and live (PostgreSQL 17.10,
-  pgvector 0.8.0, least-privilege `mise_app` role); Upstash, Vercel, Railway and
-  Grafana are written but unapplied for want of credentials, so apply with
-  `-target` on the Neon resources until they exist.
+- `infra/` — Terraform (Phase 1). Neon, Upstash and Vercel are applied and live;
+  Railway and Grafana are written but unapplied for want of credentials, so
+  apply with `-target` until they exist.
 - SQL migrations live in `apps/extractor/migrations/`. pgvector is enabled there
   because no Terraform provider can do it.
 

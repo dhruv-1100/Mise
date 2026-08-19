@@ -116,8 +116,15 @@ variable "neon_pg_version" {
   default     = 17
 }
 
-variable "upstash_region" {
-  description = "Upstash Redis region, e.g. us-east-1."
+variable "upstash_primary_region" {
+  description = <<-EOT
+    Primary region for the Upstash Redis database, e.g. us-east-1.
+
+    Upstash deprecated regional databases; every database is now "global",
+    which means one primary region plus optional read replicas. This is that
+    primary. Keep it close to the Neon region — the extractor hits Postgres and
+    Redis on every job.
+  EOT
   type        = string
   default     = "us-east-1"
 }

@@ -51,7 +51,7 @@ if extraction is unreliable.
 
 | Metric | Current |
 | --- | --- |
-| Cost per month | $0 (Neon free tier; nothing else provisioned) |
+| Cost per month | $0 (Neon + Upstash + Vercel, all free tier) |
 | Cost per 1,000 extractions | ~$3.40 (Gemini 3.5 Flash, n=5) |
 | Queue depth (p95) | — |
 | Error rate | — |
