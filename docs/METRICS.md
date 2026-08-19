@@ -52,6 +52,7 @@ if extraction is unreliable.
 | Metric | Current |
 | --- | --- |
 | Cost per month | $0 (Neon free tier; nothing else provisioned) |
+| Cost per 1,000 extractions | ~$3.40 (Gemini 3.5 Flash, n=5) |
 | Queue depth (p95) | — |
 | Error rate | — |
 | Cache hit rate | — |
@@ -91,3 +92,4 @@ trustworthy; the percentages are not. Re-measure on the Phase 2.2 50-video set.
 | --- | --- |
 | 2026-08-17 | File created. Phase 0 scaffold complete; nothing measured yet. |
 | 2026-08-17 | Phase 2.1 spike run. Captions unreachable without OAuth (401, not the predicted 403); descriptions carry more than expected. See `docs/adr/0001-content-sourcing.md`. |
+| 2026-08-18 | Extraction pipeline running end to end on Gemini over the 5 cached descriptions. 4/5 produced schema-valid recipes; the 5th correctly refused. Normalization removes 20-88% of lines before billing. No accuracy number yet — that needs the Phase 2.2 labelled set. See `docs/adr/0002-llm-provider.md`. |
