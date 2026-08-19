@@ -28,6 +28,17 @@ account state.
 - **Upstash regional databases are deprecated.** `region` must now be
   `"global"`, with the old value moving to `primary_region`; a regional value
   returns a 400. A global database is one primary plus optional read replicas.
+- **Deleting a Grafana stack can invalidate the token that deleted it.** On the
+  free tier the org slug and the stack slug are the same string, and an access
+  policy scoped to that stack dies with it. Deleting `gracefullichen3169` to
+  free the one-stack quota immediately turned a working `glc_` token into
+  `401 InvalidCredentials`, so Terraform could not then create the replacement.
+  Create the access policy with **Realm: Org**, and expect to reissue the token
+  after deleting a stack regardless.
+- **Grafana tokens carry their region, and it is not opaque.** `glc_` tokens are
+  base64. Decode the payload and use the `m.r` value for `grafana_region`; a
+  mismatch fails as an authorisation error rather than an obvious wrong-region
+  one.
 - **Organization API keys need an explicit `org_id`.** A personal key does not.
   If `/users/me` and `/regions` return 401 while `/projects` works, the key is
   an organization key. Get the id with:

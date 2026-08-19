@@ -130,7 +130,17 @@ variable "upstash_primary_region" {
 }
 
 variable "grafana_region" {
-  description = "Grafana Cloud region slug, e.g. prod-us-east-0."
+  description = <<-EOT
+    Grafana Cloud region slug, e.g. prod-us-east-3.
+
+    This must match the region the access-policy token was issued for, not a
+    region you pick. The token is base64, not opaque, and carries its region:
+
+      python3 -c "import base64,json;print(json.loads(base64.b64decode('<token minus glc_>'+'==')))"
+
+    A mismatch fails at apply with a confusing authorisation error rather than
+    an obvious wrong-region one.
+  EOT
   type        = string
-  default     = "prod-us-east-0"
+  default     = "prod-us-east-3"
 }
