@@ -4,11 +4,11 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phase 0 complete. Phase 2.1 complete — see
-`docs/adr/0001-content-sourcing.md`; the headline is that captions are
-unreachable without creator OAuth and descriptions are the primary source.
-Phase 1 in progress: CI is written, Terraform is written and validates but has
-never been applied. See `BUILD_PLAN.md` for all 12 phases.
+**Status:** Phases 0, 2.1, and 3 complete. Phase 1 in progress: CI is written,
+Terraform is written and validates but has never been applied. The headline
+finding so far is `docs/adr/0001-content-sourcing.md` — captions are unreachable
+without creator OAuth, so descriptions are the primary source. See
+`BUILD_PLAN.md` for all 12 phases.
 
 ## Architecture
 
@@ -16,7 +16,9 @@ never been applied. See `BUILD_PLAN.md` for all 12 phases.
 - `apps/extractor` — Python 3.12 + FastAPI, managed by uv. Owns all LLM calls
   and parsing. The web app never calls an LLM directly.
 - `packages/scaling` — pure TypeScript, zero runtime deps, 100% branch coverage
-  required (enforced from Phase 3).
+  enforced (`pnpm test` fails below it, so CI fails below it). `@mise/schema` is
+  a devDependency consumed only via `import type`, which is erased at compile
+  time — verified by inspecting the emitted JS, not assumed.
 - `packages/schema` — the recipe contract, as zod schemas with inferred types.
   Mirrored by hand in `apps/extractor/app/schema.py` (Pydantic); both are
   validated against the shared fixtures in `packages/schema/fixtures/`, which is
@@ -56,7 +58,7 @@ pnpm 11 requires Node 22.13+, so do not bump it without bumping Node first.
 pnpm install            # once, at the repo root
 pnpm dev                # Next.js dev server on :3000
 pnpm build              # production build
-pnpm test               # vitest across packages (empty suites pass)
+pnpm test               # vitest; fails if packages/scaling drops below 100% branches
 pnpm lint               # eslint across all workspaces
 pnpm typecheck          # tsc --noEmit across all workspaces
 ```
@@ -82,7 +84,10 @@ terraform -chdir=infra plan                # needs TF_VAR_* creds; see infra/REA
 ## Testing
 
 - `packages/scaling` — property-based tests via fast-check. Required. Write the
-  tests first; this is the one component where correctness beats speed.
+  tests first; this is the one component where correctness beats speed. The
+  arbitraries call the real `classify()` rather than keeping their own idea of
+  what a countable ingredient is — a second copy of that knowledge drifted and
+  produced a false failure once already.
 - **Changing the recipe contract** means adding a fixture to
   `packages/schema/fixtures/`, watching both suites fail, then changing both
   `packages/schema/src/recipe.ts` and `apps/extractor/app/schema.py`. Never one
@@ -114,7 +119,5 @@ terraform -chdir=infra plan                # needs TF_VAR_* creds; see infra/REA
 - **Next 15, not 16.** `create-next-app@latest` now ships Next 16.3.1; pinned to
   15.5.23 to match the plan. Bumping to 16 lets `apps/web/eslint.config.mjs`
   drop its `FlatCompat` shim.
-- **No `@vitest/coverage-v8` yet.** The 100%-branch-coverage gate on
-  `packages/scaling` needs it; add in Phase 1 with the CI workflow.
 - **Node 20 is EOL.** Next 15 supports it, but Phase 1 should move to Node 22
   LTS before CI is pinned to a version.
