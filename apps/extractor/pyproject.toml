@@ -6,6 +6,10 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115",
     "google-genai>=1.0",
+    # Arrives transitively through google-genai, but app/youtube.py imports it
+    # directly, and depending on someone else's dependency graph is how a
+    # working build breaks on an unrelated upgrade.
+    "httpx>=0.28",
     "pydantic>=2.9",
     "uvicorn>=0.32",
 ]
@@ -13,7 +17,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8.3",
-    "httpx>=0.28",  # required by fastapi.testclient.TestClient
     "ruff>=0.8",
 ]
 
@@ -26,6 +29,8 @@ package = false
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q --strict-markers --strict-config"
+# anyio ships the pytest plugin; no extra dependency needed for async tests.
+markers = ["anyio: run this test on an anyio event loop"]
 filterwarnings = [
     "error",
     # TODO(phase-1): migrate the test client off httpx onto httpx2.

@@ -4,10 +4,10 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phases 0, 2.1 and 3 complete. Phase 2.3 runs end to end
-(normalize -> LLM extract -> units) on Gemini; entity resolution and the
-sanity-rule validator are still open, and there is no accuracy number until the
-Phase 2.2 labelled set exists. Phase 1 in progress: CI is written,
+**Status:** Phases 0, 2.1 and 3 complete. Phase 2.3 works from a real YouTube
+URL: fetch -> normalize -> extract -> units, exposed as `POST /extract`. Entity
+resolution and the sanity-rule validator are still open, and there is no
+accuracy number until the Phase 2.2 labelled set exists. Phase 1 in progress: CI is written,
 Terraform is written and validates but has never been applied. The headline
 finding so far is `docs/adr/0001-content-sourcing.md` — captions are unreachable
 without creator OAuth, so descriptions are the primary source. See
@@ -18,11 +18,13 @@ without creator OAuth, so descriptions are the primary source. See
 - `apps/web` — Next.js 15 App Router, TypeScript, Tailwind 4. BFF pattern.
 - `apps/extractor` — Python 3.12 + FastAPI, managed by uv. Owns all LLM calls
   and parsing. The web app never calls an LLM directly. Pipeline stages are pure
-  functions in `app/`: `normalize.py` (strip description noise), `extract.py`
-  (LLM extraction and mapping onto the contract), `units.py` (canonical
-  grams/ml). All LLM access goes through the `LlmProvider` protocol in
-  `app/llm.py` — nothing else imports the SDK, and tests use `FakeProvider` so
-  they run offline. Entity resolution is not built yet.
+  functions in `app/`, joined by `pipeline.py`: `youtube.py` (fetch the
+  description, 1 quota unit), `normalize.py` (strip description noise),
+  `extract.py` (LLM extraction and mapping onto the contract), `units.py`
+  (canonical grams/ml). Both external boundaries are protocols —
+  `DescriptionFetcher` and `LlmProvider` — so the whole pipeline runs offline in
+  tests with no keys and no cost. `POST /extract` takes a video id or any
+  YouTube URL. Entity resolution is not built yet.
 - `packages/scaling` — pure TypeScript, zero runtime deps, 100% branch coverage
   enforced (`pnpm test` fails below it, so CI fails below it). `@mise/schema` is
   a devDependency consumed only via `import type`, which is erased at compile
@@ -80,7 +82,10 @@ uv sync                 # once
 uv run pytest
 uv run ruff check
 uv run ruff format
-uv run uvicorn app.main:app --reload   # :8000
+uv run uvicorn app.main:app --reload   # :8000, needs YOUTUBE_API_KEY + GEMINI_API_KEY
+
+# curl -X POST localhost:8000/extract -H 'Content-Type: application/json' \
+#   -d '{"video":"https://youtu.be/VIDEO_ID"}'
 ```
 
 ```bash
