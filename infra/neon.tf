@@ -16,6 +16,7 @@
 
 resource "neon_project" "main" {
   name       = local.name
+  org_id     = var.neon_org_id
   region_id  = var.neon_region
   pg_version = var.neon_pg_version
 
