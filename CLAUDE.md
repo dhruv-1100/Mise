@@ -18,13 +18,11 @@ without creator OAuth, so descriptions are the primary source. See
 - `apps/web` — Next.js 15 App Router, TypeScript, Tailwind 4. BFF pattern.
 - `apps/extractor` — Python 3.12 + FastAPI, managed by uv. Owns all LLM calls
   and parsing. The web app never calls an LLM directly. Pipeline stages are pure
-  functions in `app/`, joined by `pipeline.py`: `youtube.py` (fetch the
-  description, 1 quota unit), `normalize.py` (strip description noise),
-  `extract.py` (LLM extraction and mapping onto the contract), `units.py`
-  (canonical grams/ml). Both external boundaries are protocols —
-  `DescriptionFetcher` and `LlmProvider` — so the whole pipeline runs offline in
-  tests with no keys and no cost. `POST /extract` takes a video id or any
-  YouTube URL. Entity resolution is not built yet.
+  functions in `app/`: `normalize.py` (strip description noise), `extract.py`
+  (LLM extraction and mapping onto the contract), `units.py` (canonical
+  grams/ml). All LLM access goes through the `LlmProvider` protocol in
+  `app/llm.py` — nothing else imports the SDK, and tests use `FakeProvider` so
+  they run offline. Entity resolution is not built yet.
 - `packages/scaling` — pure TypeScript, zero runtime deps, 100% branch coverage
   enforced (`pnpm test` fails below it, so CI fails below it). `@mise/schema` is
   a devDependency consumed only via `import type`, which is erased at compile
