@@ -32,9 +32,12 @@ without creator OAuth, so descriptions are the primary source. See
   validated against the shared fixtures in `packages/schema/fixtures/`, which is
   what stops the two definitions drifting. `extractor.proto` and generated
   TS/Python stubs replace the mirror in Phase 4.
-- `infra/` — Terraform (Phase 1).
-- Postgres (Neon) with pgvector, Redis (Upstash) for cache + job queue — both
-  Phase 1. Neither exists yet.
+- `infra/` — Terraform (Phase 1). Neon is applied and live (PostgreSQL 17.10,
+  pgvector 0.8.0, least-privilege `mise_app` role); Upstash, Vercel, Railway and
+  Grafana are written but unapplied for want of credentials, so apply with
+  `-target` on the Neon resources until they exist.
+- SQL migrations live in `apps/extractor/migrations/`. pgvector is enabled there
+  because no Terraform provider can do it.
 
 Workspace packages export TypeScript source, not build output; `apps/web`
 compiles them via `transpilePackages`, so there is no build-ordering problem.

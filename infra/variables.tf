@@ -16,6 +16,22 @@ variable "neon_api_key" {
   sensitive   = true
 }
 
+variable "neon_org_id" {
+  description = <<-EOT
+    Neon organization id, e.g. org-wispy-sky-28561259.
+
+    Required when the API key is an ORGANIZATION key rather than a personal one.
+    Organization keys cannot create a project without it, and cannot read
+    /users/me or /regions at all — so if those endpoints 401 while /projects
+    works, that is the key type telling you which it is.
+
+    Find it with:
+      curl -H "Authorization: Bearer $NEON_API_KEY" \
+        https://console.neon.tech/api/v2/users/me/organizations
+  EOT
+  type        = string
+}
+
 variable "upstash_email" {
   description = "Email of the Upstash account."
   type        = string

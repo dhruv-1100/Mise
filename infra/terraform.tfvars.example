@@ -13,6 +13,10 @@
 #   export TF_VAR_railway_token=...
 #   export TF_VAR_grafana_cloud_access_policy_token=...
 
+# Organization id — required because the Neon API key is an organization key.
+# Not a secret, so it lives here rather than in the environment.
+neon_org_id = "org-xxxxxxxx-xxxx-00000000"
+
 project_name = "mise"
 environment  = "prod"
 github_repo  = "dhruv-1100/Mise"

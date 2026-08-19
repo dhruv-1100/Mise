@@ -16,12 +16,17 @@
 
 resource "neon_project" "main" {
   name       = local.name
+  org_id     = var.neon_org_id
   region_id  = var.neon_region
   pg_version = var.neon_pg_version
 
-  // Neon's free tier keeps history for 24h. Longer retention costs storage and
-  // buys point-in-time recovery we do not need before there are real users.
-  history_retention_seconds = 86400
+  // 6 hours, which is the free tier's hard maximum — the API rejects anything
+  // above 21600 with a 400. It was set to 86400 here on the assumption that the
+  // free tier allowed 24h; neither terraform validate nor plan catches that,
+  // because it is a server-side quota rather than a schema constraint. Raise
+  // this only alongside a paid plan, and only once point-in-time recovery is
+  // worth paying storage for.
+  history_retention_seconds = 21600
 }
 
 resource "neon_database" "app" {

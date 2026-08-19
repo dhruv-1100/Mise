@@ -3,15 +3,39 @@
 //
 //   terraform output -raw database_url
 
+// neon_project.connection_uri points at the project's DEFAULT database and
+// owner role (neondb / neondb_owner), not the ones declared in neon.tf. Handing
+// that to the app would mean connecting to the wrong database as a superuser-ish
+// role, which defeats the point of creating a least-privilege app role at all.
+// These build the real thing.
+
 output "database_url" {
-  description = "Postgres connection string. Set as DATABASE_URL."
-  value       = neon_project.main.connection_uri
-  sensitive   = true
+  description = "Postgres connection string for the app role and database. Set as DATABASE_URL."
+  value = format(
+    "postgres://%s:%s@%s/%s?sslmode=require",
+    neon_role.app.name,
+    neon_role.app.password,
+    neon_project.main.database_host,
+    neon_database.app.name,
+  )
+  sensitive = true
 }
 
 output "database_url_pooled" {
-  description = "Pooled connection string. Use this from serverless functions, which open far more connections than a long-lived process."
-  value       = neon_project.main.connection_uri_pooler
+  description = "Pooled connection string for the app role. Use this from serverless functions, which open far more connections than a long-lived process."
+  value = format(
+    "postgres://%s:%s@%s/%s?sslmode=require",
+    neon_role.app.name,
+    neon_role.app.password,
+    neon_project.main.database_host_pooler,
+    neon_database.app.name,
+  )
+  sensitive = true
+}
+
+output "owner_database_url" {
+  description = "Project owner connection string, for migrations and admin only. Never give this to the application."
+  value       = neon_project.main.connection_uri
   sensitive   = true
 }
 

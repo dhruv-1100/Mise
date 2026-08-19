@@ -13,6 +13,13 @@ concurrency:
 permissions:
   contents: read
 
+# Actions are pinned to exact released versions, not moving major tags.
+# astral-sh/setup-uv publishes no `v10` tag — only `v10.0.1` — so a major-tag
+# reference there fails at job setup with "unable to resolve action", which is
+# how every Python job in this workflow's first ten runs died. Exact pins cannot
+# drift out from under the build, and every tag here was checked to resolve
+# before being written.
+
 env:
   # Node 20 matches local dev. Note pnpm 11 requires Node >= 22.13, so this pin
   # and the packageManager pin in package.json move together or not at all.
@@ -26,13 +33,13 @@ jobs:
     name: web + packages (Node)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       # Reads the version from package.json#packageManager, so CI can never
       # drift from local.
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6.0.10
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -59,9 +66,9 @@ jobs:
       run:
         working-directory: apps/extractor
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
           cache-dependency-glob: apps/extractor/uv.lock
@@ -85,9 +92,9 @@ jobs:
       run:
         working-directory: infra
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
-      - uses: hashicorp/setup-terraform@v4
+      - uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_version: "1.15.8"
 
@@ -110,7 +117,7 @@ jobs:
     name: guardrails
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: No secrets committed
         run: |
