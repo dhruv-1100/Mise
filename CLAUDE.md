@@ -8,8 +8,9 @@ A web app that converts cooking videos into structured, scalable recipes.
 URL: fetch -> normalize -> extract -> units, exposed as `POST /extract`. Entity
 resolution and the sanity-rule validator are still open, and there is no
 accuracy number until the Phase 2.2 labelled set exists. Phase 1 nearly done: CI
-is green, and Neon, Upstash, Vercel and Grafana are provisioned via Terraform;
-only Railway is outstanding, blocked on billing rather than configuration. The headline finding so far is
+is green and all five providers are provisioned via Terraform — Neon, Upstash,
+Vercel, Grafana and Cloud Run — with a clean plan. The extractor image is still
+the placeholder; CI does not build or deploy it yet. The headline finding so far is
 `docs/adr/0001-content-sourcing.md` — captions are unreachable without creator
 OAuth, so descriptions are the primary source. See `BUILD_PLAN.md` for all 12
 phases.
@@ -33,8 +34,9 @@ phases.
   validated against the shared fixtures in `packages/schema/fixtures/`, which is
   what stops the two definitions drifting. `extractor.proto` and generated
   TS/Python stubs replace the mirror in Phase 4.
-- `infra/` — Terraform (Phase 1). Neon, Upstash, Vercel and Grafana are applied
-  and live; Railway is blocked on billing, so apply with `-target` to skip it.
+- `infra/` — Terraform (Phase 1), all applied and live: Neon, Upstash, Vercel,
+  Grafana and Cloud Run. Railway was dropped for having no free tier; see
+  `infra/README.md`.
 - SQL migrations live in `apps/extractor/migrations/`. pgvector is enabled there
   because no Terraform provider can do it.
 

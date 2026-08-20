@@ -3,8 +3,7 @@
 Terraform for Neon (Postgres), Upstash (Redis), Vercel (web), Cloud Run
 (extractor), and Grafana Cloud (metrics).
 
-**Status: Neon, Upstash, Vercel and Grafana are applied and live. Cloud Run is
-written but not applied — it needs a GCP project id and credentials.**
+**Status: all five providers are applied and live. `terraform plan` is clean.**
 
 | Provider | State | Detail |
 | --- | --- | --- |
@@ -12,7 +11,12 @@ written but not applied — it needs a GCP project id and credentials.**
 | Upstash | live | global Redis, primary `us-east-1`, TLS, eviction off |
 | Vercel | live | project `mise-prod`, Next.js, root `apps/web`, linked to `dhruv-1100/Mise@main` |
 | Grafana | live | stack `miseprod` at `prod-us-east-3`, metrics-write policy + token, verified against the Prometheus endpoint |
-| Cloud Run | **not applied** | replaced Railway; needs a GCP project id and credentials |
+| Cloud Run | live | `mise-prod-extractor` in `mise-505819`/`us-east1`, scale-to-zero, dedicated service account, Artifact Registry repo `mise-prod` |
+
+Cloud Run required a billing account on the project even to stay inside the free
+tier — GCP refuses to provision the service without one. That is an account
+prerequisite rather than a cost: the free allowance still applies and the
+service scales to zero.
 
 Railway was dropped, not deferred. The token was valid and listed projects, but
 `projectCreate` returned "Your trial has expired. Please select a plan" —
