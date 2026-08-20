@@ -129,17 +129,32 @@ variable "upstash_primary_region" {
   default     = "us-east-1"
 }
 
-variable "grafana_region" {
+variable "grafana_access_policy_region" {
   description = <<-EOT
-    Grafana Cloud region slug, e.g. prod-us-east-3.
+    Region for the Grafana Cloud ACCESS POLICY.
 
-    This must match the region the access-policy token was issued for, not a
-    region you pick. The token is base64, not opaque, and carries its region:
+    Counter-intuitively this is NOT the coarse region in the token ("us"). The
+    policy here uses a stack realm, and a stack-realm policy must be created in
+    the same region as the stack it points at — otherwise the API returns
+    409 "Stack must be in region us", which reads like a stack problem and is
+    really a policy-region problem.
 
-      python3 -c "import base64,json;print(json.loads(base64.b64decode('<token minus glc_>'+'==')))"
+    So: keep this equal to grafana_stack_region_slug. An ORG-realm policy would
+    accept either value, but an org realm would hand the metrics token access to
+    every stack in the account, which is worse than a confusing error.
+  EOT
+  type        = string
+  default     = "prod-us-east-3"
+}
 
-    A mismatch fails at apply with a confusing authorisation error rather than
-    an obvious wrong-region one.
+variable "grafana_stack_region_slug" {
+  description = <<-EOT
+    Region slug for the Grafana Cloud STACK, e.g. prod-us-east-3.
+
+    List the valid ones with:
+      curl -H "Authorization: Bearer $GRAFANA_TOKEN" https://grafana.com/api/stack-regions
+
+    Keep it near the Neon and Upstash regions.
   EOT
   type        = string
   default     = "prod-us-east-3"

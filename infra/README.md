@@ -3,16 +3,16 @@
 Terraform for Neon (Postgres), Upstash (Redis), Vercel (web), Railway
 (extractor), and Grafana Cloud (metrics).
 
-**Status: Neon, Upstash and Vercel are applied and live. Railway and Grafana
-are not.**
+**Status: Neon, Upstash, Vercel and Grafana are applied and live. Railway is
+blocked on billing, not on configuration.**
 
 | Provider | State | Detail |
 | --- | --- | --- |
 | Neon | live | `mise-prod` (`curly-recipe-02809405`), db `mise`, role `mise_app`, PG 17.10, pgvector 0.8.0 |
 | Upstash | live | global Redis, primary `us-east-1`, TLS, eviction off |
 | Vercel | live | project `mise-prod`, Next.js, root `apps/web`, linked to `dhruv-1100/Mise@main` |
-| Railway | not applied | no valid token yet |
-| Grafana | not applied | no token yet |
+| Grafana | live | stack `miseprod` at `prod-us-east-3`, metrics-write policy + token, verified against the Prometheus endpoint |
+| Railway | **blocked** | token is valid; `projectCreate` returns "Your trial has expired. Please select a plan." Railway has no free tier. |
 
 Until the last two exist, apply with `-target`; an untargeted `plan` reaches
 every provider and fails on placeholder tokens.
@@ -36,9 +36,17 @@ account state.
   Create the access policy with **Realm: Org**, and expect to reissue the token
   after deleting a stack regardless.
 - **Grafana tokens carry their region, and it is not opaque.** `glc_` tokens are
-  base64. Decode the payload and use the `m.r` value for `grafana_region`; a
-  mismatch fails as an authorisation error rather than an obvious wrong-region
-  one.
+  base64; the `m.r` field is the region the token was issued for.
+- **Grafana has two region vocabularies, and the obvious pairing is wrong.**
+  Stacks take a slug (`prod-us-east-3`); access policies take a region that, for
+  a **stack-realm** policy, must equal the stack's slug — *not* the coarse `us`
+  in the token. Getting it wrong returns 409 "Stack must be in region us",
+  which reads like a stack problem and is a policy-region problem. An org-realm
+  policy accepts either, but would grant the metrics token access to every stack
+  in the account. Hence two separate variables.
+- **A Railway token that fails `me` is not necessarily invalid.** Workspace
+  tokens cannot query `me` and must be tested with a workspace-scoped query such
+  as `projects`. Diagnosing on `me` alone reports a working token as broken.
 - **Organization API keys need an explicit `org_id`.** A personal key does not.
   If `/users/me` and `/regions` return 401 while `/projects` works, the key is
   an organization key. Get the id with:

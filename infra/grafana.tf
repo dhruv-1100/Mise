@@ -7,14 +7,14 @@
 resource "grafana_cloud_stack" "main" {
   name        = local.name
   slug        = replace(local.name, "-", "")
-  region_slug = var.grafana_region
+  region_slug = var.grafana_stack_region_slug
   description = "Mise — system health, extraction pipeline, and product metrics."
 }
 
 // Token the services use to push metrics. Scoped to writing metrics only, so
 // leaking it cannot read dashboards or alter alert rules.
 resource "grafana_cloud_access_policy" "metrics_write" {
-  region       = var.grafana_region
+  region       = var.grafana_access_policy_region
   name         = "${local.name}-metrics-write"
   display_name = "Mise metrics write"
 
@@ -27,7 +27,7 @@ resource "grafana_cloud_access_policy" "metrics_write" {
 }
 
 resource "grafana_cloud_access_policy_token" "metrics_write" {
-  region           = var.grafana_region
+  region           = var.grafana_access_policy_region
   access_policy_id = grafana_cloud_access_policy.metrics_write.policy_id
   name             = "${local.name}-metrics-write"
   display_name     = "Mise metrics write"

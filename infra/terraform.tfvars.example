@@ -27,5 +27,7 @@ github_repo  = "dhruv-1100/Mise"
 neon_region     = "aws-us-east-1"
 neon_pg_version = 17
 upstash_primary_region = "us-east-1"
-# Must match the region baked into the Grafana token — see variables.tf.
-grafana_region  = "prod-us-east-3"
+# Two different vocabularies, deliberately separate — see variables.tf.
+# The access policy region must match the token; the stack takes a slug.
+grafana_access_policy_region = "prod-us-east-3" # must equal the stack region
+grafana_stack_region_slug    = "prod-us-east-3"

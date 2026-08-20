@@ -33,9 +33,8 @@ phases.
   validated against the shared fixtures in `packages/schema/fixtures/`, which is
   what stops the two definitions drifting. `extractor.proto` and generated
   TS/Python stubs replace the mirror in Phase 4.
-- `infra/` — Terraform (Phase 1). Neon, Upstash and Vercel are applied and live;
-  Railway and Grafana are written but unapplied for want of credentials, so
-  apply with `-target` until they exist.
+- `infra/` — Terraform (Phase 1). Neon, Upstash, Vercel and Grafana are applied
+  and live; Railway is blocked on billing, so apply with `-target` to skip it.
 - SQL migrations live in `apps/extractor/migrations/`. pgvector is enabled there
   because no Terraform provider can do it.
 
