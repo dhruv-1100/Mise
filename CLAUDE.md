@@ -8,8 +8,8 @@ A web app that converts cooking videos into structured, scalable recipes.
 URL: fetch -> normalize -> extract -> units, exposed as `POST /extract`. Entity
 resolution and the sanity-rule validator are still open, and there is no
 accuracy number until the Phase 2.2 labelled set exists. Phase 1 nearly done: CI
-is green, and Neon, Upstash and Vercel are provisioned via Terraform; Railway and
-Grafana await credentials. The headline finding so far is
+is green, and Neon, Upstash, Vercel and Grafana are provisioned via Terraform;
+only Railway is outstanding, blocked on billing rather than configuration. The headline finding so far is
 `docs/adr/0001-content-sourcing.md` — captions are unreachable without creator
 OAuth, so descriptions are the primary source. See `BUILD_PLAN.md` for all 12
 phases.
