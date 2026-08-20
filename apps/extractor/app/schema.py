@@ -170,6 +170,77 @@ class Recipe(Base):
         return self
 
 
+class JobState(StrEnum):
+    """Lifecycle of an extraction job."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class JobStage(StrEnum):
+    """Pipeline stages, in order.
+
+    User-facing on purpose. BUILD_PLAN.md §5.2 asks for "live status, not a
+    spinner. Show stage names." — so this is contract, not an internal detail.
+    """
+
+    FETCHING = "fetching"
+    NORMALIZING = "normalizing"
+    EXTRACTING = "extracting"
+    CANONICALISING = "canonicalising"
+
+
+class JobError(Base):
+    code: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+
+
+class Job(Base):
+    """Mirrors `packages/schema/src/job.ts`. Change both or neither."""
+
+    job_id: str = Field(min_length=1)
+    video_id: VideoId
+    state: JobState
+    #: Completed attempts; 0 while first queued.
+    attempt: int = Field(ge=0)
+
+    queued_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+    stage: JobStage | None
+    error: JobError | None
+
+    #: Served from cache without re-extracting. Cache hit rate is a Phase 7
+    #: metric and is unmeasurable if the response does not say.
+    cached: bool
+
+    @model_validator(mode="after")
+    def error_matches_state(self) -> "Job":
+        if self.state is JobState.FAILED and self.error is None:
+            raise ValueError("a failed job must carry an error")
+        if self.state is not JobState.FAILED and self.error is not None:
+            raise ValueError(f'state "{self.state}" must not carry an error')
+        return self
+
+    @model_validator(mode="after")
+    def timestamps_match_state(self) -> "Job":
+        if self.state is JobState.RUNNING and self.started_at is None:
+            raise ValueError("a running job must have startedAt")
+        if self.state in (JobState.SUCCEEDED, JobState.FAILED) and self.finished_at is None:
+            raise ValueError(f'state "{self.state}" is terminal and must have finishedAt')
+        return self
+
+    @model_validator(mode="after")
+    def stage_only_while_running(self) -> "Job":
+        # A stage is a position inside the work; it means nothing outside it.
+        if self.state is not JobState.RUNNING and self.stage is not None:
+            raise ValueError(f'state "{self.state}" must not carry a stage')
+        return self
+
+
 class ExtractionOk(Base):
     status: Literal["ok"]
     recipe: Recipe

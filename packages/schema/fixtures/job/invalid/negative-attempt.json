@@ -1,0 +1,8 @@
+{
+  "jobId": "01JQ8Z3K5M7N9P0Q2R4S6T8V",
+  "videoId": "aaaaaaaaaaa",
+  "state": "queued",
+  "attempt": -1,
+  "queuedAt": "2026-08-20T10:00:00Z",
+  "startedAt": null, "finishedAt": null, "stage": null, "error": null, "cached": false
+}

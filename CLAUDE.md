@@ -22,7 +22,8 @@ phases.
   and parsing. The web app never calls an LLM directly. Pipeline stages are pure
   functions in `app/`: `normalize.py` (strip description noise), `extract.py`
   (LLM extraction and mapping onto the contract), `units.py` (canonical
-  grams/ml), `evaluation.py` (scoring against ground truth). All LLM access
+  grams/ml), `evaluation.py` (scoring against ground truth), `queue.py`
+  (Redis-backed jobs: idempotency, retry/DLQ, cache, backpressure). All LLM access
   goes through the `LlmProvider` protocol in
   `app/llm.py` — nothing else imports the SDK, and tests use `FakeProvider` so
   they run offline. Entity resolution is not built yet.
