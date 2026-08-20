@@ -1,10 +1,10 @@
 # Infrastructure
 
-Terraform for Neon (Postgres), Upstash (Redis), Vercel (web), Railway
+Terraform for Neon (Postgres), Upstash (Redis), Vercel (web), Cloud Run
 (extractor), and Grafana Cloud (metrics).
 
-**Status: Neon, Upstash, Vercel and Grafana are applied and live. Railway is
-blocked on billing, not on configuration.**
+**Status: Neon, Upstash, Vercel and Grafana are applied and live. Cloud Run is
+written but not applied — it needs a GCP project id and credentials.**
 
 | Provider | State | Detail |
 | --- | --- | --- |
@@ -12,7 +12,13 @@ blocked on billing, not on configuration.**
 | Upstash | live | global Redis, primary `us-east-1`, TLS, eviction off |
 | Vercel | live | project `mise-prod`, Next.js, root `apps/web`, linked to `dhruv-1100/Mise@main` |
 | Grafana | live | stack `miseprod` at `prod-us-east-3`, metrics-write policy + token, verified against the Prometheus endpoint |
-| Railway | **blocked** | token is valid; `projectCreate` returns "Your trial has expired. Please select a plan." Railway has no free tier. |
+| Cloud Run | **not applied** | replaced Railway; needs a GCP project id and credentials |
+
+Railway was dropped, not deferred. The token was valid and listed projects, but
+`projectCreate` returned "Your trial has expired. Please select a plan" —
+Railway has no free tier. `BUILD_PLAN.md` §1.1 named Fly.io as the alternative;
+Cloud Run was chosen instead because it scales to zero and extraction is bursty,
+so an always-on machine would be paying to idle.
 
 Until the last two exist, apply with `-target`; an untargeted `plan` reaches
 every provider and fails on placeholder tokens.
@@ -63,7 +69,8 @@ export TF_VAR_neon_api_key=...
 export TF_VAR_upstash_email=...
 export TF_VAR_upstash_api_key=...
 export TF_VAR_vercel_api_token=...
-export TF_VAR_railway_token=...
+export TF_VAR_youtube_api_key=...
+export TF_VAR_gemini_api_key=...
 export TF_VAR_grafana_cloud_access_policy_token=...
 
 cp terraform.tfvars.example terraform.tfvars   # non-secret values only
@@ -116,15 +123,16 @@ Confirmed live: `vector` 0.8.0.
 | Vercel | `vercel/vercel` | Official |
 | Upstash | `upstash/upstash` | Official |
 | Grafana | `grafana/grafana` | Official |
+| Google | `hashicorp/google` | Official |
 | **Neon** | `kislerdm/neon` | **Community.** Neon publishes no official provider. |
-| **Railway** | `terraform-community-providers/railway` | **Community, pre-1.0** (0.6.2). |
 
-This matters in two ways. Practically, a pre-1.0 provider can break between
+
+This matters in two ways. Practically, a community provider can break between
 minor versions, which is why `versions.tf` pins with `~>` and
 `.terraform.lock.hcl` is committed. And if you say "provisioned via Terraform"
 in an interview, be ready for "which providers?" — the honest answer is that
-two of the five are community-maintained, and knowing that is a better signal
-than not.
+only Neon is community-maintained, and knowing which is a better signal than
+not.
 
 ### `database_url` is the app role, not the project owner
 
@@ -136,6 +144,14 @@ high-privilege role, which defeats creating a least-privilege role at all.
 The `database_url` and `database_url_pooled` outputs build the real connection
 string for `mise_app` against `mise`. `owner_database_url` exposes the owner
 credential for migrations and admin, and should never reach the application.
+
+### Cloud Run starts on a placeholder image
+
+`google_cloud_run_v2_service` needs an image at create time, and the real one
+does not exist until CI has built it. The service is created on
+`gcr.io/cloudrun/hello`, and `lifecycle.ignore_changes` covers the image field —
+without that, every `terraform apply` would roll production back to
+hello-world. CI owns the image from then on; Terraform owns everything else.
 
 ### State is local
 
@@ -153,13 +169,15 @@ Move to a remote backend before CI ever applies.
 
 Everything targets a free tier. Total should sit near $0–15/month, which is
 itself a number worth reporting. Things that would change it: Upstash
-autoscaling, Neon history retention beyond 24h, Railway usage past the monthly
-credit, and any Grafana Cloud usage past the free metric series limit.
+autoscaling, Neon history retention beyond the free cap, Cloud Run traffic past
+the monthly free allowance, and any Grafana Cloud usage past the free metric
+series limit.
 
 ## What is deliberately not here
 
 - **`deploy.yml`.** Nothing is provisioned, so there is nothing to deploy to.
 - **DNS / custom domains.** No domain registered yet.
-- **Environment variables on the Vercel and Railway projects.** They would have
-  to reference outputs that do not exist until after the first apply. Wire them
-  in a second pass, once `terraform output` returns real values.
+- **Environment variables on the Vercel project.** They would have to reference
+  outputs that do not exist until after the first apply. Wire them in a second
+  pass, once `terraform output` returns real values. The Cloud Run service does
+  get its keys, because it cannot start without them.

@@ -50,8 +50,14 @@ variable "vercel_api_token" {
   sensitive   = true
 }
 
-variable "railway_token" {
-  description = "Railway account token. railway.app -> Account -> Tokens."
+variable "youtube_api_key" {
+  description = "YouTube Data API key, passed to the Cloud Run service."
+  type        = string
+  sensitive   = true
+}
+
+variable "gemini_api_key" {
+  description = "Gemini API key, passed to the Cloud Run service."
   type        = string
   sensitive   = true
 }
@@ -88,6 +94,22 @@ variable "environment" {
     condition     = contains(["dev", "staging", "prod"], var.environment)
     error_message = "environment must be one of: dev, staging, prod."
   }
+}
+
+variable "gcp_project_id" {
+  description = <<-EOT
+    Google Cloud project id hosting the extractor, e.g. mise-prod-470112.
+
+    This is the project ID, not the display name and not the project number.
+    Find it with:  gcloud projects list
+  EOT
+  type        = string
+}
+
+variable "gcp_region" {
+  description = "Cloud Run region. Keep it near the Neon and Upstash regions."
+  type        = string
+  default     = "us-east1"
 }
 
 variable "github_repo" {
