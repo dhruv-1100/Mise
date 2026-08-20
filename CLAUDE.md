@@ -96,6 +96,7 @@ uv run scripts/spike_captions.py --replay-q4  # re-analyse cached text, 0 quota
 # descriptions are re-fetched at run time and never committed.
 cd apps/extractor
 uv run python scripts/build_eval_set.py --ids ../../eval_videos.txt
+uv run pytest tests/test_eval_labels.py     # validate labels as you write them
 uv run python scripts/eval.py --limit 5     # cheap smoke run
 uv run python scripts/eval.py --json /tmp/eval.json --fail-under-gate
 # Extraction needs GEMINI_API_KEY in .env — see docs/adr/0002-llm-provider.md
@@ -112,6 +113,9 @@ terraform -chdir=infra plan                # needs TF_VAR_* creds; see infra/REA
   arbitraries call the real `classify()` rather than keeping their own idea of
   what a countable ingredient is — a second copy of that knowledge drifted and
   produced a false failure once already.
+- **Labelling the eval set** — see `docs/LABELLING.md`. Ground truth comes from
+  the video, never from the pipeline's output or from an LLM reading the
+  description; labels derived from the thing being measured cannot measure it.
 - **Changing the recipe contract** means adding a fixture to
   `packages/schema/fixtures/`, watching both suites fail, then changing both
   `packages/schema/src/recipe.ts` and `apps/extractor/app/schema.py`. Never one
