@@ -22,7 +22,8 @@ phases.
   and parsing. The web app never calls an LLM directly. Pipeline stages are pure
   functions in `app/`: `normalize.py` (strip description noise), `extract.py`
   (LLM extraction and mapping onto the contract), `units.py` (canonical
-  grams/ml). All LLM access goes through the `LlmProvider` protocol in
+  grams/ml), `evaluation.py` (scoring against ground truth). All LLM access
+  goes through the `LlmProvider` protocol in
   `app/llm.py` — nothing else imports the SDK, and tests use `FakeProvider` so
   they run offline. Entity resolution is not built yet.
 - `packages/scaling` — pure TypeScript, zero runtime deps, 100% branch coverage
@@ -90,6 +91,13 @@ uv run uvicorn app.main:app --reload   # :8000, needs YOUTUBE_API_KEY + GEMINI_A
 ```bash
 uv run scripts/spike_captions.py ID1 ID2   # Phase 2.1 spike (self-contained)
 uv run scripts/spike_captions.py --replay-q4  # re-analyse cached text, 0 quota
+
+# Eval set (Phase 2.2). Ground truth lives in apps/extractor/tests/fixtures/eval/;
+# descriptions are re-fetched at run time and never committed.
+cd apps/extractor
+uv run python scripts/build_eval_set.py --ids ../../eval_videos.txt
+uv run python scripts/eval.py --limit 5     # cheap smoke run
+uv run python scripts/eval.py --json /tmp/eval.json --fail-under-gate
 # Extraction needs GEMINI_API_KEY in .env — see docs/adr/0002-llm-provider.md
 
 terraform -chdir=infra init
