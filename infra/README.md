@@ -93,7 +93,7 @@ terraform -chdir=infra output -raw database_url
 | Neon | API key | console.neon.tech → Account settings → API keys |
 | Upstash | Management API key | console.upstash.com → Account → Management API |
 | Vercel | API token | vercel.com/account/tokens |
-| Railway | Account token | railway.app → Account → Tokens |
+| Google Cloud | Application Default Credentials | `gcloud auth application-default login`, or a service-account key |
 | Grafana | Access policy token | grafana.com → Security → Access policies (needs `stacks:read`, `stacks:write`) |
 
 ## Things worth knowing before you apply
