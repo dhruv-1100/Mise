@@ -13,8 +13,9 @@ provider "vercel" {
   api_token = var.vercel_api_token
 }
 
-provider "railway" {
-  token = var.railway_token
+provider "google" {
+  project = var.gcp_project_id
+  region  = var.gcp_region
 }
 
 provider "grafana" {

@@ -1,0 +1,28 @@
+{
+  "video_id": "SmykLR2sh74",
+  "title": "👌 राधावल्लभी पूरी-वीकेंड ब्रंच या त्यौहार के लिए-दाल भरी खस्ता पूरी । Bengali Radhaballabhi Recipe",
+  "creator": "NishaMadhulika",
+  "_instructions": "Fill ingredients and steps from the VIDEO, not from any model output. Set expect to 'insufficient' if the description carries no usable recipe. Use qty: null with qty_text for vague amounts — never invent a number. Delete this field when done.",
+  "expect": "ok",
+  "ingredients": [
+    {
+      "name": "",
+      "qty": null,
+      "qty_text": null,
+      "unit": null,
+      "prep": null,
+      "optional": false
+    }
+  ],
+  "steps": [
+    {
+      "index": 1,
+      "text": ""
+    }
+  ],
+  "yield": {
+    "qty": null,
+    "unit": "serving"
+  },
+  "equipment": []
+}

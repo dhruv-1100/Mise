@@ -16,15 +16,16 @@ terraform {
       version = "~> 4.45"
     }
 
-    # Community-maintained. Neon publishes no official Terraform provider and
-    # Railway's is pre-1.0 — see infra/README.md before depending on either.
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 7.45"
+    }
+
+    # Community-maintained. Neon publishes no official Terraform provider —
+    # see infra/README.md before depending on it.
     neon = {
       source  = "kislerdm/neon"
       version = "~> 0.15"
-    }
-    railway = {
-      source  = "terraform-community-providers/railway"
-      version = "~> 0.6"
     }
   }
 

@@ -10,7 +10,8 @@
 #   export TF_VAR_upstash_email=...
 #   export TF_VAR_upstash_api_key=...
 #   export TF_VAR_vercel_api_token=...
-#   export TF_VAR_railway_token=...
+#   export TF_VAR_youtube_api_key=...
+#   export TF_VAR_gemini_api_key=...
 #   export TF_VAR_grafana_cloud_access_policy_token=...
 
 # Organization id — required because the Neon API key is an organization key.
@@ -21,10 +22,17 @@ project_name = "mise"
 environment  = "prod"
 github_repo  = "dhruv-1100/Mise"
 
+# Google Cloud project hosting the extractor on Cloud Run.
+gcp_project_id = "your-gcp-project-id"
+gcp_region     = "us-east1"
+
 # Keep these regions close together. The extractor hits Postgres and Redis on
 # every job, and cross-region latency lands directly in the extraction p99 that
 # Phase 7 reports against an SLO.
 neon_region     = "aws-us-east-1"
 neon_pg_version = 17
-upstash_region  = "us-east-1"
-grafana_region  = "prod-us-east-0"
+upstash_primary_region = "us-east-1"
+# Two different vocabularies, deliberately separate — see variables.tf.
+# The access policy region must match the token; the stack takes a slug.
+grafana_access_policy_region = "prod-us-east-3" # must equal the stack region
+grafana_stack_region_slug    = "prod-us-east-3"

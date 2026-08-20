@@ -1,0 +1,28 @@
+{
+  "video_id": "i_E-m62p144",
+  "title": "Paneer Tava Bhuna Masala | DHABA-STYLE Recipe | ढाबे जैसा पनीर तवा भुना मसाला | Chef Sanjyot Keer",
+  "creator": "Your Food Lab",
+  "_instructions": "Fill ingredients and steps from the VIDEO, not from any model output. Set expect to 'insufficient' if the description carries no usable recipe. Use qty: null with qty_text for vague amounts — never invent a number. Delete this field when done.",
+  "expect": "ok",
+  "ingredients": [
+    {
+      "name": "",
+      "qty": null,
+      "qty_text": null,
+      "unit": null,
+      "prep": null,
+      "optional": false
+    }
+  ],
+  "steps": [
+    {
+      "index": 1,
+      "text": ""
+    }
+  ],
+  "yield": {
+    "qty": null,
+    "unit": "serving"
+  },
+  "equipment": []
+}

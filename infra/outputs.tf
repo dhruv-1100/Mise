@@ -66,14 +66,19 @@ output "vercel_project_id" {
   value       = vercel_project.web.id
 }
 
-output "railway_project_id" {
-  description = "Railway project id, for the deploy workflow."
-  value       = railway_project.main.id
+output "extractor_url" {
+  description = "Public URL of the Cloud Run extraction service."
+  value       = google_cloud_run_v2_service.extractor.uri
 }
 
-output "railway_service_id" {
-  description = "Railway extractor service id."
-  value       = railway_service.extractor.id
+output "extractor_image_repo" {
+  description = "Artifact Registry path CI pushes the extractor image to."
+  value = format(
+    "%s-docker.pkg.dev/%s/%s",
+    var.gcp_region,
+    var.gcp_project_id,
+    google_artifact_registry_repository.extractor.repository_id,
+  )
 }
 
 output "grafana_stack_url" {

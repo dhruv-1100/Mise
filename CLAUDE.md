@@ -7,11 +7,13 @@ A web app that converts cooking videos into structured, scalable recipes.
 **Status:** Phases 0, 2.1 and 3 complete. Phase 2.3 works from a real YouTube
 URL: fetch -> normalize -> extract -> units, exposed as `POST /extract`. Entity
 resolution and the sanity-rule validator are still open, and there is no
-accuracy number until the Phase 2.2 labelled set exists. Phase 1 in progress: CI is written,
-Terraform is written and validates but has never been applied. The headline
-finding so far is `docs/adr/0001-content-sourcing.md` — captions are unreachable
-without creator OAuth, so descriptions are the primary source. See
-`BUILD_PLAN.md` for all 12 phases.
+accuracy number until the Phase 2.2 labelled set exists. Phase 1 nearly done: CI
+is green and all five providers are provisioned via Terraform — Neon, Upstash,
+Vercel, Grafana and Cloud Run — with a clean plan. The extractor image is still
+the placeholder; CI does not build or deploy it yet. The headline finding so far is
+`docs/adr/0001-content-sourcing.md` — captions are unreachable without creator
+OAuth, so descriptions are the primary source. See `BUILD_PLAN.md` for all 12
+phases.
 
 ## Architecture
 
@@ -20,7 +22,8 @@ without creator OAuth, so descriptions are the primary source. See
   and parsing. The web app never calls an LLM directly. Pipeline stages are pure
   functions in `app/`: `normalize.py` (strip description noise), `extract.py`
   (LLM extraction and mapping onto the contract), `units.py` (canonical
-  grams/ml). All LLM access goes through the `LlmProvider` protocol in
+  grams/ml), `evaluation.py` (scoring against ground truth). All LLM access
+  goes through the `LlmProvider` protocol in
   `app/llm.py` — nothing else imports the SDK, and tests use `FakeProvider` so
   they run offline. Entity resolution is not built yet.
 - `packages/scaling` — pure TypeScript, zero runtime deps, 100% branch coverage
@@ -32,10 +35,9 @@ without creator OAuth, so descriptions are the primary source. See
   validated against the shared fixtures in `packages/schema/fixtures/`, which is
   what stops the two definitions drifting. `extractor.proto` and generated
   TS/Python stubs replace the mirror in Phase 4.
-- `infra/` — Terraform (Phase 1). Neon is applied and live (PostgreSQL 17.10,
-  pgvector 0.8.0, least-privilege `mise_app` role); Upstash, Vercel, Railway and
-  Grafana are written but unapplied for want of credentials, so apply with
-  `-target` on the Neon resources until they exist.
+- `infra/` — Terraform (Phase 1), all applied and live: Neon, Upstash, Vercel,
+  Grafana and Cloud Run. Railway was dropped for having no free tier; see
+  `infra/README.md`.
 - SQL migrations live in `apps/extractor/migrations/`. pgvector is enabled there
   because no Terraform provider can do it.
 
@@ -89,6 +91,13 @@ uv run uvicorn app.main:app --reload   # :8000, needs YOUTUBE_API_KEY + GEMINI_A
 ```bash
 uv run scripts/spike_captions.py ID1 ID2   # Phase 2.1 spike (self-contained)
 uv run scripts/spike_captions.py --replay-q4  # re-analyse cached text, 0 quota
+
+# Eval set (Phase 2.2). Ground truth lives in apps/extractor/tests/fixtures/eval/;
+# descriptions are re-fetched at run time and never committed.
+cd apps/extractor
+uv run python scripts/build_eval_set.py --ids ../../eval_videos.txt
+uv run python scripts/eval.py --limit 5     # cheap smoke run
+uv run python scripts/eval.py --json /tmp/eval.json --fail-under-gate
 # Extraction needs GEMINI_API_KEY in .env — see docs/adr/0002-llm-provider.md
 
 terraform -chdir=infra init

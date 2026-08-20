@@ -50,8 +50,14 @@ variable "vercel_api_token" {
   sensitive   = true
 }
 
-variable "railway_token" {
-  description = "Railway account token. railway.app -> Account -> Tokens."
+variable "youtube_api_key" {
+  description = "YouTube Data API key, passed to the Cloud Run service."
+  type        = string
+  sensitive   = true
+}
+
+variable "gemini_api_key" {
+  description = "Gemini API key, passed to the Cloud Run service."
   type        = string
   sensitive   = true
 }
@@ -90,6 +96,22 @@ variable "environment" {
   }
 }
 
+variable "gcp_project_id" {
+  description = <<-EOT
+    Google Cloud project id hosting the extractor, e.g. mise-prod-470112.
+
+    This is the project ID, not the display name and not the project number.
+    Find it with:  gcloud projects list
+  EOT
+  type        = string
+}
+
+variable "gcp_region" {
+  description = "Cloud Run region. Keep it near the Neon and Upstash regions."
+  type        = string
+  default     = "us-east1"
+}
+
 variable "github_repo" {
   description = "owner/name of the GitHub repository Vercel deploys from."
   type        = string
@@ -116,14 +138,46 @@ variable "neon_pg_version" {
   default     = 17
 }
 
-variable "upstash_region" {
-  description = "Upstash Redis region, e.g. us-east-1."
+variable "upstash_primary_region" {
+  description = <<-EOT
+    Primary region for the Upstash Redis database, e.g. us-east-1.
+
+    Upstash deprecated regional databases; every database is now "global",
+    which means one primary region plus optional read replicas. This is that
+    primary. Keep it close to the Neon region — the extractor hits Postgres and
+    Redis on every job.
+  EOT
   type        = string
   default     = "us-east-1"
 }
 
-variable "grafana_region" {
-  description = "Grafana Cloud region slug, e.g. prod-us-east-0."
+variable "grafana_access_policy_region" {
+  description = <<-EOT
+    Region for the Grafana Cloud ACCESS POLICY.
+
+    Counter-intuitively this is NOT the coarse region in the token ("us"). The
+    policy here uses a stack realm, and a stack-realm policy must be created in
+    the same region as the stack it points at — otherwise the API returns
+    409 "Stack must be in region us", which reads like a stack problem and is
+    really a policy-region problem.
+
+    So: keep this equal to grafana_stack_region_slug. An ORG-realm policy would
+    accept either value, but an org realm would hand the metrics token access to
+    every stack in the account, which is worse than a confusing error.
+  EOT
   type        = string
-  default     = "prod-us-east-0"
+  default     = "prod-us-east-3"
+}
+
+variable "grafana_stack_region_slug" {
+  description = <<-EOT
+    Region slug for the Grafana Cloud STACK, e.g. prod-us-east-3.
+
+    List the valid ones with:
+      curl -H "Authorization: Bearer $GRAFANA_TOKEN" https://grafana.com/api/stack-regions
+
+    Keep it near the Neon and Upstash regions.
+  EOT
+  type        = string
+  default     = "prod-us-east-3"
 }
