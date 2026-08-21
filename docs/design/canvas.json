@@ -1,26 +1,48 @@
 {
+  "pages": [
+    { "id": "page-mobile",  "name": "Mobile + tokens" },
+    { "id": "page-desktop", "name": "Desktop" }
+  ],
   "artboards": [
-    { "file": "Tokens.dc.html",     "title": "Design tokens",        "x": 0,    "y": 0,    "w": 900, "h": 1460 },
+    { "file": "Tokens.dc.html",     "title": "Design tokens",             "page": "page-mobile", "x": 0,    "y": 0,    "w": 900, "h": 2100 },
 
-    { "file": "Main.dc.html",       "title": "Landing",              "x": 0,    "y": 1580, "w": 390, "h": 844 },
-    { "file": "Extracting.dc.html", "title": "Extraction in progress","x": 450,  "y": 1580, "w": 390, "h": 844 },
-    { "file": "Recipe.dc.html",     "title": "Recipe + serving stepper","x": 900,"y": 1580, "w": 390, "h": 1180 },
-    { "file": "CookMode.dc.html",   "title": "Cook mode",            "x": 1350, "y": 1580, "w": 390, "h": 844 },
+    { "file": "Main.dc.html",       "title": "Landing",                   "page": "page-mobile", "x": 0,    "y": 2220, "w": 390, "h": 844 },
+    { "file": "Extracting.dc.html", "title": "Extraction in progress",    "page": "page-mobile", "x": 450,  "y": 2220, "w": 390, "h": 844 },
+    { "file": "Recipe.dc.html",     "title": "Recipe + serving stepper",  "page": "page-mobile", "x": 900,  "y": 2220, "w": 390, "h": 1180 },
+    { "file": "CookMode.dc.html",   "title": "Cook mode",                 "page": "page-mobile", "x": 1350, "y": 2220, "w": 390, "h": 844 },
 
-    { "file": "Creator.dc.html",    "title": "Creator page",         "x": 0,    "y": 2840, "w": 390, "h": 900 },
-    { "file": "Feed.dc.html",       "title": "Feed / discovery",     "x": 450,  "y": 2840, "w": 390, "h": 900 },
-    { "file": "Saved.dc.html",      "title": "Saved recipes",        "x": 900,  "y": 2840, "w": 390, "h": 844 },
-    { "file": "States.dc.html",     "title": "Empty + error states", "x": 1350, "y": 2840, "w": 390, "h": 1120 }
+    { "file": "Creator.dc.html",    "title": "Creator page",              "page": "page-mobile", "x": 0,    "y": 3480, "w": 390, "h": 900 },
+    { "file": "Feed.dc.html",       "title": "Feed / discovery",          "page": "page-mobile", "x": 450,  "y": 3480, "w": 390, "h": 900 },
+    { "file": "Saved.dc.html",      "title": "Saved recipes",             "page": "page-mobile", "x": 900,  "y": 3480, "w": 390, "h": 844 },
+    { "file": "States.dc.html",     "title": "Empty + error states",      "page": "page-mobile", "x": 1350, "y": 3480, "w": 390, "h": 1120 },
+
+    { "file": "DeskLanding.dc.html",    "title": "Landing",               "page": "page-desktop", "x": 0,    "y": 0,    "w": 1440, "h": 820 },
+    { "file": "DeskExtracting.dc.html", "title": "Extraction in progress","page": "page-desktop", "x": 1540, "y": 0,    "w": 1440, "h": 820 },
+    { "file": "DeskCookMode.dc.html",   "title": "Cook mode",             "page": "page-desktop", "x": 3080, "y": 0,    "w": 1440, "h": 900 },
+
+    { "file": "DeskRecipe.dc.html",     "title": "Recipe + serving stepper","page": "page-desktop", "x": 0,   "y": 1020, "w": 1440, "h": 1860 },
+    { "file": "DeskFeed.dc.html",       "title": "Feed / discovery",      "page": "page-desktop", "x": 1540, "y": 1020, "w": 1440, "h": 1080 },
+    { "file": "DeskCreator.dc.html",    "title": "Creator page",          "page": "page-desktop", "x": 3080, "y": 1020, "w": 1440, "h": 1000 },
+
+    { "file": "DeskSaved.dc.html",      "title": "Saved recipes",         "page": "page-desktop", "x": 1540, "y": 2220, "w": 1440, "h": 780 },
+    { "file": "DeskStates.dc.html",     "title": "Empty + error states",  "page": "page-desktop", "x": 3080, "y": 2220, "w": 1440, "h": 820 }
   ],
   "annotations": [
-    { "id": "note-direction", "x": 960, "y": 0, "w": 320,
+    { "id": "note-direction", "page": "page-mobile", "x": 960, "y": 0, "w": 320,
       "text": "Direction comes from BUILD_PLAN §5.1: warm neutral base, one saturated accent, deliberately not the Tailwind blue-and-gray that reads as template.\n\naccent / herb / warn share lightness 0.565 and chroma 0.168 and differ only in hue, so semantic colour is carried by hue rather than by one of them shouting." },
-    { "id": "note-cookmode", "x": 1800, "y": 1580, "w": 320,
+    { "id": "note-contrast", "page": "page-mobile", "x": 960, "y": 300, "w": 320,
+      "text": "The contrast audit found a real defect. Matched oklch lightness makes the trio perceptually even — but WCAG luminance is NOT perceptual lightness, and herb and warn measured 4.0:1 and 4.4:1 on ground, under the 4.5 small text needs.\n\nThe matched trio stays for fills and icons (3:1). herb-text and warn-text carry text." },
+    { "id": "note-cookmode", "page": "page-mobile", "x": 1800, "y": 2220, "w": 320,
       "text": "Cook mode is the constraint that shaped the type scale: legible at arm's length, on a counter, with wet hands.\n\n28px step text, 18px floor everywhere, 44px minimum targets, inverted for glare. Designed first; the browsing screens scale down from it rather than the reverse." },
-    { "id": "note-stepper", "x": 1800, "y": 2200, "w": 320,
+    { "id": "note-stepper", "page": "page-mobile", "x": 1800, "y": 2840, "w": 320,
       "text": "The serving stepper actually runs the Phase 3 engine — try it. Salt and spices grow by factor^0.7176, potatoes round to whole units and say so, and 'to taste' never becomes a number.\n\nAdvisories appear inline, never in a modal." },
-    { "id": "note-states", "x": 1800, "y": 2840, "w": 320,
-      "text": "Every error here is a real outcome the pipeline returns, with its actual code. 'No written recipe' is the Hebbars Kitchen case from ADR 0001 — roughly one video in five, and the one place the product must refuse rather than invent." }
+    { "id": "note-states", "page": "page-mobile", "x": 1800, "y": 3480, "w": 320,
+      "text": "Every error here is a real outcome the pipeline returns, with its actual code. 'No written recipe' is the Hebbars Kitchen case from ADR 0001 — roughly one video in five, and the one place the product must refuse rather than invent." },
+
+    { "id": "note-desktop", "page": "page-desktop", "x": 0, "y": -220, "w": 460,
+      "text": "Desktop is the adaptation, not the origin — 390px was designed first, as BUILD_PLAN §5.4 asks.\n\nSo the rule here is: only restructure where the extra width changes what a person can DO. Recipe becomes two columns because the ingredient rail can stay put while the method scrolls, which is the whole reason to want a big screen while cooking. Feed and Creator become grids because scanning many is the task.\n\nExtracting and Saved deliberately stay a single centred column: wider would only mean longer lines to read." },
+    { "id": "note-desk-cook", "page": "page-desktop", "x": 3080, "y": -220, "w": 400,
+      "text": "Cook mode drops the app chrome at every width — no nav, no search. It is the one screen where the phone is propped up and everything else is in the way.\n\nOn desktop it gains a second column so ingredients and the timer sit beside the step instead of below it, and the step text goes to 42px: further from the eye than a phone on a counter." }
   ],
-  "launch": { "view": "canvas" }
+  "launch": { "view": "canvas", "page": "page-desktop" }
 }

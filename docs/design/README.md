@@ -1,7 +1,8 @@
 # Design — Phase 5
 
 The canvas is the deliverable; these are the working files it is seeded from.
-Nine artboards: a token sheet and eight screens at 390px.
+Seventeen artboards across two pages: a token sheet and eight screens at 390px,
+then the same eight at 1440px.
 
 Re-seed after editing any `.dc.html`, then republish to the same artifact URL.
 
@@ -75,6 +76,23 @@ Not yet verified: focus order and screen-reader labelling. Those need the real
 DOM in Phase 6, not a static artboard, and claiming them from a mockup would be
 dishonest.
 
+## Desktop (§5.4)
+
+390px was designed first and desktop is the adaptation, which is the ordering
+the plan asks for. The rule applied: **only restructure where the extra width
+changes what a person can do.**
+
+| Screen | At 1440px | Why |
+| --- | --- | --- |
+| Recipe | Two columns, sticky ingredient rail | The rail stays put while the method scrolls — the actual reason to want a big screen while cooking |
+| Feed, Creator | Three-column grid | Scanning many is the task |
+| Landing | Split hero with a real extraction beside it | Room to show the output rather than describe it |
+| Cook mode | Two columns, 42px step text | Further from the eye than a phone on a counter |
+| Extracting, Saved, States | Centred column, unchanged structure | Wider would only mean longer lines to read |
+
+Cook mode drops the app chrome at every width — no nav, no search. It is the
+one screen where the phone is propped up and everything else is in the way.
+
 ## Handoff
 
 Tokens live in `apps/web/app/globals.css` as CSS custom properties plus a
@@ -88,11 +106,11 @@ not the same one inverted.
 
 ## Not done
 
-- **Desktop widths.** `BUILD_PLAN.md` §5.2 asks for eight screens at mobile
-  *and* desktop. Only 390px exists. The plan's own instruction is to design at
-  390 first and treat desktop as the adaptation, so this is the ordering it
-  asks for — but it is half the deliverable, and Phase 5's exit criteria are
-  not met until the desktop pass exists.
 - Open Graph / share images (Phase 6).
+- **Focus order and screen-reader labelling.** These need the real DOM, not a
+  static artboard, so they are a Phase 6 obligation rather than a claim that
+  can honestly be made here.
+- A tablet breakpoint. The two widths bracket it; whether it needs its own
+  layout is a question for real usage.
 - The feed's ranked surface is a placeholder; it has nothing to rank until
   Phase 10.

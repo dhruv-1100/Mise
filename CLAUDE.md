@@ -4,8 +4,7 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phases 0, 2.1, 3, 4 complete; Phase 5 mobile-only (desktop widths
-outstanding). Phase 2.3 works from a real YouTube
+**Status:** Phases 0, 2.1, 3, 4 and 5 complete. Phase 2.3 works from a real YouTube
 URL: fetch -> normalize -> extract -> units, exposed as `POST /extract`. Entity
 resolution and the sanity-rule validator are still open, and there is no
 accuracy number until the Phase 2.2 labelled set exists. Phase 1 nearly done: CI
