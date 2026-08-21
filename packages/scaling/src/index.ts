@@ -8,9 +8,9 @@
  * so nothing it depends on reaches the runtime.
  */
 
-export { formatQuantity } from "./format.js";
-export { scale } from "./scale.js";
-export { classify, isBakingRecipe, isEgg } from "./taxonomy.js";
+export { formatQuantity } from "./format";
+export { scale } from "./scale";
+export { classify, isBakingRecipe, isEgg } from "./taxonomy";
 export type {
   AdvisoryCode,
   ScaledIngredient,
@@ -21,4 +21,4 @@ export type {
   ScalingClass,
   ScalingWarning,
   ScalingWarningCode,
-} from "./types.js";
+} from "./types";

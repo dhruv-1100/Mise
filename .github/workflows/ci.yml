@@ -85,6 +85,47 @@ jobs:
       - name: Test
         run: uv run --frozen pytest
 
+  codegen:
+    name: proto stubs are current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: pnpm/action-setup@v6.0.10
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: apps/extractor/uv.lock
+
+      - name: Install
+        run: |
+          pnpm install --frozen-lockfile
+          uv sync --frozen --directory apps/extractor
+
+      # Generated stubs are committed so nobody needs protoc to build, which
+      # makes them capable of drifting from the .proto. Regenerating and
+      # diffing is what stops a contract change landing on one side only.
+      - name: Regenerate
+        run: ./scripts/codegen.sh
+
+      - name: Stubs match the proto
+        run: |
+          # porcelain rather than `git diff`: diff only sees TRACKED files, so
+          # a stub the proto newly produces would slip past it as untracked.
+          CHANGED=$(git status --porcelain -- apps/extractor/app/gen packages/schema/src/gen)
+          if [ -n "$CHANGED" ]; then
+            echo "::error::Generated stubs are out of date. Run ./scripts/codegen.sh and commit."
+            echo "$CHANGED"
+            exit 1
+          fi
+          echo "OK: stubs match extractor.proto"
+
   terraform:
     name: infra (Terraform)
     runs-on: ubuntu-latest

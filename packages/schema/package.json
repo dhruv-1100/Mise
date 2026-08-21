@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Shared types and protobuf definitions crossing the web/extractor boundary.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./gen/*": "./src/gen/*.ts"
   },
   "scripts": {
     "lint": "eslint .",
@@ -13,6 +14,10 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.14.0",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "ts-proto": "^2.12.1"
   }
 }

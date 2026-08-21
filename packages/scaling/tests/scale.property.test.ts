@@ -9,8 +9,8 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
-import { classify, scale } from "../src/index.js";
-import { arbIngredient, arbRecipe } from "./arbitraries.js";
+import { classify, scale } from "../src/index";
+import { arbIngredient, arbRecipe } from "./arbitraries";
 
 /** Floats accumulate error; compare within a relative tolerance. */
 function closeTo(actual: number, expected: number, epsilon = 1e-9): boolean {

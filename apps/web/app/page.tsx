@@ -1,13 +1,20 @@
+import { UrlForm } from "@/components/UrlForm";
+
 export default function Home() {
   return (
-    <main className="mx-auto flex max-w-2xl flex-1 flex-col justify-center gap-3 px-6 py-16">
-      <h1 className="text-3xl font-semibold tracking-tight">Mise</h1>
-      <p className="text-base text-neutral-600 dark:text-neutral-400">
-        Turn any cooking video into a structured, scalable recipe you can
-        actually cook from.
+    <main className="mx-auto flex w-full max-w-[560px] flex-1 flex-col justify-center px-5 py-16">
+      <h1 className="font-display text-[40px] leading-[1.05] tracking-[-0.02em] sm:text-[52px]">
+        Paste a cooking video. Get a recipe you can actually cook from.
+      </h1>
+      <p className="mb-8 mt-3.5 text-base leading-relaxed text-ink-soft">
+        Ingredients, steps and a serving stepper that knows salt does not triple.
       </p>
-      <p className="text-sm text-neutral-500">
-        Phase 0 scaffold. No routes, no data, nothing to see yet.
+
+      <UrlForm />
+
+      <p className="mt-3.5 text-[13px] text-ink-faint">
+        No account needed. Nothing is downloaded or hosted — every recipe links back to the
+        creator&rsquo;s video.
       </p>
     </main>
   );

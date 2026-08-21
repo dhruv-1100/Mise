@@ -7,8 +7,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { scale } from "../src/index.js";
-import { ingredient, recipeOf } from "./arbitraries.js";
+import { scale } from "../src/index";
+import { ingredient, recipeOf } from "./arbitraries";
 
 function scaleTo(recipe: Parameters<typeof scale>[0], target: number) {
   const result = scale(recipe, target);

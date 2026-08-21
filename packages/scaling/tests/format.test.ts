@@ -8,7 +8,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
-import { formatQuantity } from "../src/index.js";
+import { formatQuantity } from "../src/index";
 
 describe("formatQuantity", () => {
   it.each([

@@ -8,7 +8,7 @@
  */
 
 import type { Ingredient, Recipe } from "@mise/schema";
-import type { ScalingClass } from "./types.js";
+import type { ScalingClass } from "./types";
 
 /**
  * Perception and chemistry do not scale with volume. Doubling a stew does not

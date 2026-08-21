@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+    :root{
+      --ground:oklch(0.982 0.008 78);
+      --surface:oklch(0.962 0.012 76);
+      --sunk:oklch(0.930 0.016 74);
+      --line:oklch(0.876 0.018 72);
+      --ink:oklch(0.235 0.018 55);
+      --ink-soft:oklch(0.478 0.020 60);
+      --ink-faint:oklch(0.628 0.018 65);
+      --accent:oklch(0.565 0.168 42);
+      --accent-deep:oklch(0.455 0.150 40);
+      --accent-wash:oklch(0.945 0.032 48);
+      --herb:oklch(0.565 0.168 148);
+      --herb-wash:oklch(0.948 0.030 150);
+      --warn:oklch(0.565 0.168 82);
+      --warn-wash:oklch(0.952 0.040 86);
+      /* Text tier. Matched oklch lightness makes accent/herb/warn perceptually
+         even, but WCAG luminance is not perceptual lightness, so herb and warn
+         land at 4.01:1 and 4.37:1 on ground — under the 4.5 small text needs.
+         The matched trio stays for fills and icons (3:1); text uses these. */
+      --herb-text:oklch(0.500 0.168 148);
+      --warn-text:oklch(0.495 0.168 82);
+      --cook-ground:oklch(0.185 0.014 55);
+      --cook-surface:oklch(0.245 0.016 55);
+      --cook-ink:oklch(0.966 0.010 80);
+      --cook-ink-soft:oklch(0.760 0.014 70);
+      --r-sm:6px; --r-md:10px; --r-lg:16px; --r-full:999px;
+      --shadow:0 1px 2px oklch(0.235 0.018 55 / 0.06), 0 8px 24px oklch(0.235 0.018 55 / 0.06);
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;background:var(--ground);color:var(--ink);
+      font-family:Manrope,ui-sans-serif,system-ui,sans-serif;
+      -webkit-font-smoothing:antialiased;}
+    a{color:var(--accent-deep);text-decoration:none;}
+    a:hover{color:var(--accent);}
+    .serif{font-family:"Instrument Serif",Georgia,serif;font-weight:400;}
+    .phone{width:390px;min-height:844px;background:var(--ground);
+      display:flex;flex-direction:column;position:relative;overflow:hidden;}
+    .pad{padding:0 20px;}
+    .tap{min-height:44px;min-width:44px;}
+    .eyebrow{font-size:12px;font-weight:600;letter-spacing:0.09em;
+      text-transform:uppercase;color:var(--ink-faint);}
+
+    .desk{width:1440px;background:var(--ground);display:flex;flex-direction:column;}
+    .wrap{width:1200px;margin:0 auto;}
+    .nav{border-bottom:1px solid var(--line);background:var(--surface);}
+</style>
+</helmet>
+<div class="desk"><div class="nav"><div class="wrap" style="display:flex;align-items:center;gap:28px;height:68px;"><div style="display:flex;align-items:center;gap:10px;margin-right:8px;"><div style="width:28px;height:28px;border-radius:var(--r-sm);background:var(--accent);display:flex;align-items:center;justify-content:center;color:var(--ground);font-family:'Instrument Serif',Georgia,serif;font-size:19px;line-height:1;">M</div><span class="serif" style="font-size:21px;">Mise</span></div><a href="#" style="font-size:15px;font-weight:600;color:var(--ink);">Feed</a><a href="#" style="font-size:15px;font-weight:500;color:var(--ink-soft);">Saved</a><div style="flex:1;"></div><div style="display:flex;align-items:center;gap:8px;background:var(--ground);border:1px solid var(--line);border-radius:var(--r-md);padding:0 12px;height:40px;width:320px;color:var(--ink-faint);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></svg><span style="font-size:14px;">Paste a YouTube link</span></div><div style="width:34px;height:34px;border-radius:var(--r-full);background:var(--accent-wash);"></div></div></div><div class="wrap" style="padding:88px 0 72px;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,0.95fr);gap:72px;align-items:center;"><div><h1 class="serif" style="font-size:66px;line-height:1.02;letter-spacing:-0.025em;margin:0 0 20px;">Paste a cooking video.<br>Get a recipe you can<br>actually cook from.</h1><p style="margin:0 0 34px;font-size:19px;line-height:1.55;color:var(--ink-soft);max-width:50ch;">Ingredients, steps and a serving stepper that knows salt does not triple.</p><div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:8px 8px 8px 20px;display:flex;align-items:center;gap:12px;max-width:560px;box-shadow:var(--shadow);"><span style="color:var(--ink-faint);flex:none;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></svg></span><span style="flex:1;font-size:16px;color:var(--ink-faint);">youtube.com/watch?v=&hellip;</span><button class="tap" style="flex:none;border:0;background:var(--accent);color:var(--ground);border-radius:var(--r-md);padding:0 22px;height:48px;font-family:inherit;font-size:16px;font-weight:600;display:flex;align-items:center;gap:9px;cursor:pointer;">Extract<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><polyline points="13 6 19 12 13 18"></polyline></svg></button></div><div style="display:flex;align-items:center;gap:9px;margin-top:16px;color:var(--ink-faint);font-size:14px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 12 9 17 20 6"></polyline></svg><span>No account needed. Nothing is downloaded or hosted.</span></div></div><div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:26px 28px;box-shadow:var(--shadow);"><div class="eyebrow" style="margin-bottom:12px;">From one paste</div><div class="serif" style="font-size:28px;line-height:1.1;margin-bottom:4px;">Aloo Paratha</div><div style="font-size:14px;color:var(--ink-soft);margin-bottom:20px;">Chef Ranveer Brar</div><div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);"><div style="width:92px;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">2 cup</div><div style="font-size:15px;">whole wheat flour</div></div><div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);"><div style="width:92px;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">1 tsp</div><div style="font-size:15px;">salt</div></div><div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);"><div style="width:92px;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">2 tbsp</div><div style="font-size:15px;">gram flour</div></div><div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);"><div style="width:92px;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">&frac12; tsp</div><div style="font-size:15px;">carom seeds</div></div><div style="display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);"><div style="width:92px;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;">to taste</div><div style="font-size:15px;">salt, for the filling</div></div><div style="margin-top:16px;font-size:13px;color:var(--ink-faint);">+ 17 more &middot; 9 steps</div></div></div></div>
+</x-dc>
+
+</body>
+</html>

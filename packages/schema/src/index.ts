@@ -9,7 +9,7 @@
  * here with `import type`, which `verbatimModuleSyntax` erases at compile time,
  * so zod never becomes a runtime dependency of that package.
  */
-export { Job, JobError, JobStage, JobState } from "./job.js";
+export { Job, JobError, JobStage, JobState } from "./job";
 export {
   Conflict,
   Confidence,
@@ -22,4 +22,4 @@ export {
   Step,
   VideoId,
   Yield,
-} from "./recipe.js";
+} from "./recipe";

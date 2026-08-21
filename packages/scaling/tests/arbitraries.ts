@@ -11,7 +11,7 @@
 import fc from "fast-check";
 import type { Ingredient, Recipe, Step } from "@mise/schema";
 
-import { classify } from "../src/index.js";
+import { classify } from "../src/index";
 
 const ID_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-".split("");
 

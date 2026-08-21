@@ -14,8 +14,8 @@ import fc from "fast-check";
 import { describe, it } from "vitest";
 import { Recipe } from "@mise/schema";
 
-import { scale } from "../src/index.js";
-import { arbRecipe } from "./arbitraries.js";
+import { scale } from "../src/index";
+import { arbRecipe } from "./arbitraries";
 
 describe("schema conformance", () => {
   it("the generator itself produces schema-valid recipes", () => {

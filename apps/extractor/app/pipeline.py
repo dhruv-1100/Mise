@@ -17,12 +17,13 @@ actually in these recipes, and building it early means throwing it away.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from app.extract import extract_recipe
 from app.llm import LlmProvider
 from app.normalize import normalize_description
-from app.schema import Creator, ExtractionInsufficient, ExtractionOk, SourceKind
+from app.schema import Creator, ExtractionInsufficient, ExtractionOk, JobStage, SourceKind
 from app.units import CanonicalQuantity, canonicalise
 from app.youtube import DescriptionFetcher, VideoMetadata
 
@@ -55,20 +56,36 @@ class PipelineOutput:
     canonical: tuple[CanonicalQuantity, ...] = field(default_factory=tuple)
 
 
+#: Called as each stage begins. The worker uses it to publish live status;
+#: nothing else does, so it defaults to a no-op rather than being required.
+StageCallback = Callable[[JobStage], Awaitable[None]]
+
+
 async def run_pipeline(
     *,
     fetcher: DescriptionFetcher,
     provider: LlmProvider,
     video_id: str,
+    on_stage: StageCallback | None = None,
 ) -> PipelineOutput:
     """Fetch, clean, extract, canonicalise.
 
     Raises `FetchError` if the video cannot be reached; that is the caller's to
     turn into an error envelope. Everything after the fetch either produces a
     recipe or an explicit `insufficient_source_material`, never an exception.
+
+    `on_stage` fires as each stage begins, which is what makes the progress
+    screen show stage names rather than a spinner.
     """
+
+    async def stage(s: JobStage) -> None:
+        if on_stage is not None:
+            await on_stage(s)
+
+    await stage(JobStage.FETCHING)
     metadata = await fetcher.fetch(video_id)
 
+    await stage(JobStage.NORMALIZING)
     normalized = normalize_description(metadata.description)
 
     creator = Creator(
@@ -79,6 +96,7 @@ async def run_pipeline(
         channel_url=metadata.channel_url,
     )
 
+    await stage(JobStage.EXTRACTING)
     result, response = await extract_recipe(
         provider,
         video_id=metadata.video_id,
@@ -87,6 +105,7 @@ async def run_pipeline(
         description=normalized.text,
     )
 
+    await stage(JobStage.CANONICALISING)
     canonical: tuple[CanonicalQuantity, ...] = ()
     if isinstance(result, ExtractionOk):
         canonical = tuple(
