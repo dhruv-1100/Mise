@@ -8,17 +8,21 @@ queue, since it takes 10-40 seconds and cannot stay synchronous. This exists so
 the pipeline is reachable and demonstrable before then.
 """
 
+import asyncio
+import json
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.llm import DEFAULT_MODEL_CHAIN, GeminiProvider, LlmError, LlmProvider
 from app.pipeline import PipelineOutput, run_pipeline
-from app.schema import ExtractionOk
+from app.queue import ExtractionQueue, QueueFull
+from app.schema import ExtractionOk, JobState
 from app.youtube import (
     DescriptionFetcher,
     FetchError,
@@ -89,14 +93,35 @@ async def lifespan(app: FastAPI):
     """
     youtube_key = os.environ.get("YOUTUBE_API_KEY", "")
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    redis_url = os.environ.get("REDIS_URL", "")
 
     app.state.fetcher = YouTubeFetcher(youtube_key) if youtube_key else None
     app.state.provider = GeminiProvider(gemini_key) if gemini_key else None
+
+    app.state.redis = None
+    app.state.queue = None
+    if redis_url:
+        # Imported here so the module loads without redis installed, and so
+        # tests that never touch the queue never construct a client.
+        from redis.asyncio import from_url
+
+        app.state.redis = from_url(redis_url, decode_responses=True)
+        app.state.queue = ExtractionQueue(redis=app.state.redis)
+
     try:
         yield
     finally:
         if app.state.fetcher is not None:
             await app.state.fetcher.aclose()
+        if app.state.redis is not None:
+            await app.state.redis.aclose()
+
+
+#: How often the SSE stream re-reads the job. The queue has no pub/sub, so this
+#: polls Redis; cheap, and it keeps the queue a plain data structure.
+SSE_POLL_SECONDS = 0.5
+#: A job that never terminates must not hold a connection open forever.
+SSE_TIMEOUT_SECONDS = 300
 
 
 app = FastAPI(
@@ -140,6 +165,18 @@ def get_fetcher(request: Request) -> DescriptionFetcher:
             ).model_dump(),
         )
     return fetcher
+
+
+def get_queue(request: Request) -> ExtractionQueue:
+    queue = request.app.state.queue
+    if queue is None:
+        raise HTTPException(
+            status_code=503,
+            detail=ErrorEnvelope(
+                error="not_configured", detail="REDIS_URL is not set"
+            ).model_dump(),
+        )
+    return queue
 
 
 def get_provider(request: Request) -> LlmProvider:
@@ -210,6 +247,122 @@ async def extract(
             model=stats.model,
             canonicalised_quantities=stats.canonicalised_quantities,
         ),
+    )
+
+
+class EnqueueResponse(BaseModel):
+    job: dict
+    #: False when an existing job was returned — already in flight, or cached.
+    created: bool
+
+
+@app.post(
+    "/jobs",
+    response_model=EnqueueResponse,
+    tags=["extraction"],
+    responses={
+        400: {"model": ErrorEnvelope},
+        429: {"model": ErrorEnvelope},
+        503: {"model": ErrorEnvelope},
+    },
+)
+async def enqueue(
+    body: ExtractRequest,
+    queue: Annotated[ExtractionQueue, Depends(get_queue)],
+) -> EnqueueResponse:
+    """Submit a video for extraction and get a job back immediately.
+
+    The asynchronous counterpart to POST /extract, which blocks for the full
+    10-40 seconds. Watch /jobs/{job_id}/events for progress.
+    """
+    video_id = parse_video_id(body.video)
+    try:
+        job, created = await queue.enqueue(video_id)
+    except QueueFull as exc:
+        # Backpressure with an actionable hint, rather than accepting work we
+        # cannot get to (BUILD_PLAN.md §4).
+        raise HTTPException(
+            status_code=429,
+            detail=ErrorEnvelope(
+                error="queue_full",
+                detail=f"queue depth {exc.depth} is at capacity",
+            ).model_dump(),
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+        ) from exc
+    return EnqueueResponse(job=job.model_dump(by_alias=True, mode="json"), created=created)
+
+
+@app.get("/jobs/{job_id}", tags=["extraction"], responses={404: {"model": ErrorEnvelope}})
+async def job_status(
+    job_id: str,
+    queue: Annotated[ExtractionQueue, Depends(get_queue)],
+) -> dict:
+    job = await queue.get(job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail=ErrorEnvelope(error="job_not_found", detail=job_id).model_dump(),
+        )
+    return job.model_dump(by_alias=True, mode="json")
+
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+async def _job_events(queue: ExtractionQueue, job_id: str) -> AsyncIterator[str]:
+    """Emit on every change, then close once the job is terminal.
+
+    Only sending on CHANGE is the point: an idle job produces no traffic, and a
+    client that connects late gets current state immediately rather than
+    waiting for the next transition.
+    """
+    last: tuple | None = None
+    waited = 0.0
+    while waited < SSE_TIMEOUT_SECONDS:
+        job = await queue.get(job_id)
+        if job is None:
+            yield _sse("error", {"error": "job_not_found", "detail": job_id})
+            return
+
+        fingerprint = (job.state, job.stage, job.attempt)
+        if fingerprint != last:
+            payload = job.model_dump(by_alias=True, mode="json")
+            if job.state is JobState.SUCCEEDED:
+                payload["recipe"] = await queue.cached_recipe(job.video_id)
+            yield _sse("status", payload)
+            last = fingerprint
+
+        if job.state in (JobState.SUCCEEDED, JobState.FAILED):
+            return
+
+        await asyncio.sleep(SSE_POLL_SECONDS)
+        waited += SSE_POLL_SECONDS
+
+    yield _sse("error", {"error": "stream_timeout", "detail": job_id})
+
+
+@app.get("/jobs/{job_id}/events", tags=["extraction"])
+async def job_events(
+    job_id: str,
+    queue: Annotated[ExtractionQueue, Depends(get_queue)],
+) -> StreamingResponse:
+    """Server-Sent Events for job progress.
+
+    SSE rather than gRPC streaming because the browser is the consumer here and
+    cannot speak gRPC without a proxy. The BFF uses the gRPC StreamStatus for
+    the same data.
+    """
+    return StreamingResponse(
+        _job_events(queue, job_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            # Without this, an nginx or Cloud Run proxy may buffer the stream
+            # and deliver every event at once when the job finishes — which
+            # looks exactly like the spinner this replaced.
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

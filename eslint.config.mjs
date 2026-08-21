@@ -7,7 +7,9 @@ import tseslint from "typescript-eslint";
  */
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/coverage/**", "**/node_modules/**"],
+    // src/gen is emitted by scripts/codegen.sh; see the note in
+    // apps/extractor/pyproject.toml for why generated output is not linted.
+    ignores: ["**/dist/**", "**/coverage/**", "**/node_modules/**", "**/src/gen/**"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

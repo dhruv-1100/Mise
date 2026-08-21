@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package mise.extractor.v1;
+
+// The service boundary between the Next.js BFF and the Python extractor.
+//
+// Extraction takes 10-40 seconds, so Extract does NOT return a recipe: it
+// enqueues and hands back a job id immediately. The caller then watches
+// StreamStatus, which pushes each stage transition as it happens rather than
+// making the client poll.
+//
+// This mirrors packages/schema/src/job.ts and apps/extractor/app/schema.py.
+// Phase 4's whole point is that these three stop being hand-maintained
+// mirrors: the generated stubs become the source of truth, and the drift test
+// against packages/schema/fixtures/ is what proves the transition is clean.
+service Extractor {
+  // Enqueue a video. Idempotent by video_id: submitting one already queued or
+  // running returns the existing job rather than racing a second worker onto
+  // the same video.
+  rpc Extract(ExtractRequest) returns (ExtractResponse);
+
+  // Server-streaming job status. Emits on every state or stage change and
+  // completes when the job reaches a terminal state, so the caller never
+  // polls and never has to guess when to stop listening.
+  rpc StreamStatus(StreamStatusRequest) returns (stream Job);
+
+  // One-shot status, for a caller that reconnected and only needs where
+  // things stand.
+  rpc GetStatus(GetStatusRequest) returns (Job);
+
+  // Liveness only — deliberately says nothing about downstream health, so an
+  // orchestrator cannot restart a healthy service because Redis is slow.
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+message ExtractRequest {
+  // A bare 11-character video id or any YouTube URL shape. The server parses
+  // and validates; the client is not trusted to have done it.
+  string video = 1;
+}
+
+message ExtractResponse {
+  Job job = 1;
+  // False when an existing job was returned instead of a new one — either the
+  // video was already in flight, or it came straight from cache.
+  bool created = 2;
+}
+
+message StreamStatusRequest {
+  string job_id = 1;
+}
+
+message GetStatusRequest {
+  string job_id = 1;
+}
+
+enum JobState {
+  JOB_STATE_UNSPECIFIED = 0;
+  JOB_STATE_QUEUED = 1;
+  JOB_STATE_RUNNING = 2;
+  JOB_STATE_SUCCEEDED = 3;
+  JOB_STATE_FAILED = 4;
+}
+
+// Pipeline stages, in order. User-facing: BUILD_PLAN.md §5.2 asks for "live
+// status, not a spinner. Show stage names."
+enum JobStage {
+  JOB_STAGE_UNSPECIFIED = 0;
+  JOB_STAGE_FETCHING = 1;
+  JOB_STAGE_NORMALIZING = 2;
+  JOB_STAGE_EXTRACTING = 3;
+  JOB_STAGE_CANONICALISING = 4;
+}
+
+message JobError {
+  // Stable machine-readable code, matching the HTTP error envelope so the BFF
+  // branches on one vocabulary regardless of transport.
+  string code = 1;
+  string message = 2;
+}
+
+message Job {
+  string job_id = 1;
+  string video_id = 2;
+  JobState state = 3;
+  // Completed attempts; 0 while first queued.
+  int32 attempt = 4;
+
+  string queued_at = 10;
+  // Empty string rather than a null: proto3 scalars have no presence, and an
+  // optional here would complicate every consumer for no gain.
+  string started_at = 11;
+  string finished_at = 12;
+
+  JobStage stage = 20;
+  JobError error = 21;
+
+  // Served from cache without re-extracting. Cache hit rate is a Phase 7
+  // metric and is unmeasurable if the response does not say.
+  bool cached = 22;
+
+  // Populated only when state is SUCCEEDED. JSON rather than a modelled
+  // message: the recipe contract is owned by packages/schema and validated by
+  // zod and Pydantic at both ends, and restating it here would create a third
+  // definition to drift.
+  string recipe_json = 30;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  string status = 1;
+  string service = 2;
+  string version = 3;
+}
