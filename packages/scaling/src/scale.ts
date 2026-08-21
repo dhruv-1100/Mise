@@ -7,14 +7,14 @@
  */
 
 import type { Ingredient, Recipe } from "@mise/schema";
-import { formatQuantity } from "./format.js";
-import { classify, isBakingRecipe, isEgg } from "./taxonomy.js";
+import { formatQuantity } from "./format";
+import { classify, isBakingRecipe, isEgg } from "./taxonomy";
 import type {
   ScaledIngredient,
   ScaleResult,
   ScalingAdvisory,
   ScalingWarning,
-} from "./types.js";
+} from "./types";
 
 /**
  * Sublinear growth exponent.

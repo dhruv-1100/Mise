@@ -12,7 +12,7 @@
 
 import { z } from "zod";
 
-import { VideoId } from "./recipe.js";
+import { VideoId } from "./recipe";
 
 export const JobState = z.enum([
   /** Accepted and waiting for a worker. */

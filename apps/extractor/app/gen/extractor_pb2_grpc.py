@@ -60,6 +60,11 @@ class ExtractorStub:
                 request_serializer=extractor__pb2.GetStatusRequest.SerializeToString,
                 response_deserializer=extractor__pb2.Job.FromString,
                 _registered_method=True)
+        self.GetRecipe = channel.unary_unary(
+                '/mise.extractor.v1.Extractor/GetRecipe',
+                request_serializer=extractor__pb2.GetRecipeRequest.SerializeToString,
+                response_deserializer=extractor__pb2.GetRecipeResponse.FromString,
+                _registered_method=True)
         self.Health = channel.unary_unary(
                 '/mise.extractor.v1.Extractor/Health',
                 request_serializer=extractor__pb2.HealthRequest.SerializeToString,
@@ -107,6 +112,17 @@ class ExtractorServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetRecipe(self, request, context):
+        """Fetch an already-extracted recipe by VIDEO id.
+
+        Distinct from GetStatus, which is keyed by job id: a recipe outlives the
+        job that produced it, and recipe pages are addressed by the video so the
+        URL is stable and shareable. Reads the cache and never enqueues.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def Health(self, request, context):
         """Liveness only — deliberately says nothing about downstream health, so an
         orchestrator cannot restart a healthy service because Redis is slow.
@@ -132,6 +148,11 @@ def add_ExtractorServicer_to_server(servicer, server):
                     servicer.GetStatus,
                     request_deserializer=extractor__pb2.GetStatusRequest.FromString,
                     response_serializer=extractor__pb2.Job.SerializeToString,
+            ),
+            'GetRecipe': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetRecipe,
+                    request_deserializer=extractor__pb2.GetRecipeRequest.FromString,
+                    response_serializer=extractor__pb2.GetRecipeResponse.SerializeToString,
             ),
             'Health': grpc.unary_unary_rpc_method_handler(
                     servicer.Health,
@@ -231,6 +252,33 @@ class Extractor:
             '/mise.extractor.v1.Extractor/GetStatus',
             extractor__pb2.GetStatusRequest.SerializeToString,
             extractor__pb2.Job.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetRecipe(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/mise.extractor.v1.Extractor/GetRecipe',
+            extractor__pb2.GetRecipeRequest.SerializeToString,
+            extractor__pb2.GetRecipeResponse.FromString,
             options,
             channel_credentials,
             insecure,

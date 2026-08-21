@@ -142,6 +142,20 @@ export interface GetStatusRequest {
   jobId: string;
 }
 
+export interface GetRecipeRequest {
+  videoId: string;
+}
+
+export interface GetRecipeResponse {
+  /**
+   * Empty when found is false. JSON for the same reason as Job.recipe_json:
+   * the recipe contract is owned by packages/schema and restating it here
+   * would create a third definition to drift.
+   */
+  recipeJson: string;
+  found: boolean;
+}
+
 export interface JobError {
   /**
    * Stable machine-readable code, matching the HTTP error envelope so the BFF
@@ -485,6 +499,168 @@ export const GetStatusRequest: MessageFns<GetStatusRequest> = {
   fromPartial(object: DeepPartial<GetStatusRequest>): GetStatusRequest {
     const message = createBaseGetStatusRequest();
     message.jobId = object.jobId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetRecipeRequest(): GetRecipeRequest {
+  return { videoId: "" };
+}
+
+export const GetRecipeRequest: MessageFns<GetRecipeRequest> = {
+  encode(message: GetRecipeRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.videoId !== "") {
+      writer.uint32(10).string(message.videoId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetRecipeRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetRecipeRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.videoId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetRecipeRequest {
+    return {
+      videoId: isSet(object.videoId)
+        ? globalThis.String(object.videoId)
+        : isSet(object.video_id)
+        ? globalThis.String(object.video_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetRecipeRequest): unknown {
+    const obj: any = {};
+    if (message.videoId !== "") {
+      obj.videoId = message.videoId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetRecipeRequest>): GetRecipeRequest {
+    return GetRecipeRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetRecipeRequest>): GetRecipeRequest {
+    const message = createBaseGetRecipeRequest();
+    message.videoId = object.videoId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetRecipeResponse(): GetRecipeResponse {
+  return { recipeJson: "", found: false };
+}
+
+export const GetRecipeResponse: MessageFns<GetRecipeResponse> = {
+  encode(message: GetRecipeResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.recipeJson !== "") {
+      writer.uint32(10).string(message.recipeJson);
+    }
+    if (message.found !== false) {
+      writer.uint32(16).bool(message.found);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetRecipeResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetRecipeResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.recipeJson = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.found = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetRecipeResponse {
+    return {
+      recipeJson: isSet(object.recipeJson)
+        ? globalThis.String(object.recipeJson)
+        : isSet(object.recipe_json)
+        ? globalThis.String(object.recipe_json)
+        : "",
+      found: isSet(object.found) ? globalThis.Boolean(object.found) : false,
+    };
+  },
+
+  toJSON(message: GetRecipeResponse): unknown {
+    const obj: any = {};
+    if (message.recipeJson !== "") {
+      obj.recipeJson = message.recipeJson;
+    }
+    if (message.found !== false) {
+      obj.found = message.found;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<GetRecipeResponse>): GetRecipeResponse {
+    return GetRecipeResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<GetRecipeResponse>): GetRecipeResponse {
+    const message = createBaseGetRecipeResponse();
+    message.recipeJson = object.recipeJson ?? "";
+    message.found = object.found ?? false;
     return message;
   },
 };
@@ -1047,6 +1223,21 @@ export const ExtractorDefinition = {
       requestType: GetStatusRequest as typeof GetStatusRequest,
       requestStream: false,
       responseType: Job as typeof Job,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * Fetch an already-extracted recipe by VIDEO id.
+     *
+     * Distinct from GetStatus, which is keyed by job id: a recipe outlives the
+     * job that produced it, and recipe pages are addressed by the video so the
+     * URL is stable and shareable. Reads the cache and never enqueues.
+     */
+    getRecipe: {
+      name: "GetRecipe",
+      requestType: GetRecipeRequest as typeof GetRecipeRequest,
+      requestStream: false,
+      responseType: GetRecipeResponse as typeof GetRecipeResponse,
       responseStream: false,
       options: {},
     },

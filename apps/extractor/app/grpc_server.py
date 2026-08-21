@@ -134,6 +134,16 @@ class ExtractorService(pb_grpc.ExtractorServicer):
                 return
             job = refreshed
 
+    async def GetRecipe(self, request: pb.GetRecipeRequest, context) -> pb.GetRecipeResponse:
+        """Read an already-extracted recipe by video id.
+
+        Never enqueues. A miss is `found: false`, not an error — "we have not
+        extracted this yet" is a normal answer and the caller decides whether
+        to submit it.
+        """
+        recipe_json = await self._recipe_json(request.video_id)
+        return pb.GetRecipeResponse(recipe_json=recipe_json, found=bool(recipe_json))
+
     async def Health(self, request: pb.HealthRequest, context) -> pb.HealthResponse:
         return pb.HealthResponse(status="ok", service="mise-extractor", version=self._version)
 

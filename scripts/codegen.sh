@@ -34,7 +34,7 @@ echo "  typescript -> packages/schema/src/gen/"
   -I "../../$PROTO_DIR" \
   --plugin=protoc-gen-ts_proto="../../packages/schema/node_modules/.bin/protoc-gen-ts_proto" \
   --ts_proto_out="../../packages/schema/src/gen" \
-  --ts_proto_opt=esModuleInterop=true,outputServices=generic-definitions,useExactTypes=false,importSuffix=.js \
+  --ts_proto_opt=esModuleInterop=true,outputServices=generic-definitions,useExactTypes=false \
   "$PROTO")
 
 echo "  done"

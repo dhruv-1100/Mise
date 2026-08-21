@@ -28,6 +28,13 @@ service Extractor {
   // things stand.
   rpc GetStatus(GetStatusRequest) returns (Job);
 
+  // Fetch an already-extracted recipe by VIDEO id.
+  //
+  // Distinct from GetStatus, which is keyed by job id: a recipe outlives the
+  // job that produced it, and recipe pages are addressed by the video so the
+  // URL is stable and shareable. Reads the cache and never enqueues.
+  rpc GetRecipe(GetRecipeRequest) returns (GetRecipeResponse);
+
   // Liveness only — deliberately says nothing about downstream health, so an
   // orchestrator cannot restart a healthy service because Redis is slow.
   rpc Health(HealthRequest) returns (HealthResponse);
@@ -52,6 +59,18 @@ message StreamStatusRequest {
 
 message GetStatusRequest {
   string job_id = 1;
+}
+
+message GetRecipeRequest {
+  string video_id = 1;
+}
+
+message GetRecipeResponse {
+  // Empty when found is false. JSON for the same reason as Job.recipe_json:
+  // the recipe contract is owned by packages/schema and restating it here
+  // would create a third definition to drift.
+  string recipe_json = 1;
+  bool found = 2;
 }
 
 enum JobState {

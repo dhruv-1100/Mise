@@ -24,17 +24,17 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x65xtractor.proto\x12\x11mise.extractor.v1\"\x1f\n\x0e\x45xtractRequest\x12\r\n\x05video\x18\x01 \x01(\t\"G\n\x0f\x45xtractResponse\x12#\n\x03job\x18\x01 \x01(\x0b\x32\x16.mise.extractor.v1.Job\x12\x0f\n\x07\x63reated\x18\x02 \x01(\x08\"%\n\x13StreamStatusRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\t\"\"\n\x10GetStatusRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\t\")\n\x08JobError\x12\x0c\n\x04\x63ode\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\"\x9d\x02\n\x03Job\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x10\n\x08video_id\x18\x02 \x01(\t\x12*\n\x05state\x18\x03 \x01(\x0e\x32\x1b.mise.extractor.v1.JobState\x12\x0f\n\x07\x61ttempt\x18\x04 \x01(\x05\x12\x11\n\tqueued_at\x18\n \x01(\t\x12\x12\n\nstarted_at\x18\x0b \x01(\t\x12\x13\n\x0b\x66inished_at\x18\x0c \x01(\t\x12*\n\x05stage\x18\x14 \x01(\x0e\x32\x1b.mise.extractor.v1.JobStage\x12*\n\x05\x65rror\x18\x15 \x01(\x0b\x32\x1b.mise.extractor.v1.JobError\x12\x0e\n\x06\x63\x61\x63hed\x18\x16 \x01(\x08\x12\x13\n\x0brecipe_json\x18\x1e \x01(\t\"\x0f\n\rHealthRequest\"B\n\x0eHealthResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x0f\n\x07version\x18\x03 \x01(\t*\x81\x01\n\x08JobState\x12\x19\n\x15JOB_STATE_UNSPECIFIED\x10\x00\x12\x14\n\x10JOB_STATE_QUEUED\x10\x01\x12\x15\n\x11JOB_STATE_RUNNING\x10\x02\x12\x17\n\x13JOB_STATE_SUCCEEDED\x10\x03\x12\x14\n\x10JOB_STATE_FAILED\x10\x04*\x90\x01\n\x08JobStage\x12\x19\n\x15JOB_STAGE_UNSPECIFIED\x10\x00\x12\x16\n\x12JOB_STAGE_FETCHING\x10\x01\x12\x19\n\x15JOB_STAGE_NORMALIZING\x10\x02\x12\x18\n\x14JOB_STAGE_EXTRACTING\x10\x03\x12\x1c\n\x18JOB_STAGE_CANONICALISING\x10\x04\x32\xc8\x02\n\tExtractor\x12P\n\x07\x45xtract\x12!.mise.extractor.v1.ExtractRequest\x1a\".mise.extractor.v1.ExtractResponse\x12P\n\x0cStreamStatus\x12&.mise.extractor.v1.StreamStatusRequest\x1a\x16.mise.extractor.v1.Job0\x01\x12H\n\tGetStatus\x12#.mise.extractor.v1.GetStatusRequest\x1a\x16.mise.extractor.v1.Job\x12M\n\x06Health\x12 .mise.extractor.v1.HealthRequest\x1a!.mise.extractor.v1.HealthResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0f\x65xtractor.proto\x12\x11mise.extractor.v1\"\x1f\n\x0e\x45xtractRequest\x12\r\n\x05video\x18\x01 \x01(\t\"G\n\x0f\x45xtractResponse\x12#\n\x03job\x18\x01 \x01(\x0b\x32\x16.mise.extractor.v1.Job\x12\x0f\n\x07\x63reated\x18\x02 \x01(\x08\"%\n\x13StreamStatusRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\t\"\"\n\x10GetStatusRequest\x12\x0e\n\x06job_id\x18\x01 \x01(\t\"$\n\x10GetRecipeRequest\x12\x10\n\x08video_id\x18\x01 \x01(\t\"7\n\x11GetRecipeResponse\x12\x13\n\x0brecipe_json\x18\x01 \x01(\t\x12\r\n\x05\x66ound\x18\x02 \x01(\x08\")\n\x08JobError\x12\x0c\n\x04\x63ode\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\"\x9d\x02\n\x03Job\x12\x0e\n\x06job_id\x18\x01 \x01(\t\x12\x10\n\x08video_id\x18\x02 \x01(\t\x12*\n\x05state\x18\x03 \x01(\x0e\x32\x1b.mise.extractor.v1.JobState\x12\x0f\n\x07\x61ttempt\x18\x04 \x01(\x05\x12\x11\n\tqueued_at\x18\n \x01(\t\x12\x12\n\nstarted_at\x18\x0b \x01(\t\x12\x13\n\x0b\x66inished_at\x18\x0c \x01(\t\x12*\n\x05stage\x18\x14 \x01(\x0e\x32\x1b.mise.extractor.v1.JobStage\x12*\n\x05\x65rror\x18\x15 \x01(\x0b\x32\x1b.mise.extractor.v1.JobError\x12\x0e\n\x06\x63\x61\x63hed\x18\x16 \x01(\x08\x12\x13\n\x0brecipe_json\x18\x1e \x01(\t\"\x0f\n\rHealthRequest\"B\n\x0eHealthResponse\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x0f\n\x07service\x18\x02 \x01(\t\x12\x0f\n\x07version\x18\x03 \x01(\t*\x81\x01\n\x08JobState\x12\x19\n\x15JOB_STATE_UNSPECIFIED\x10\x00\x12\x14\n\x10JOB_STATE_QUEUED\x10\x01\x12\x15\n\x11JOB_STATE_RUNNING\x10\x02\x12\x17\n\x13JOB_STATE_SUCCEEDED\x10\x03\x12\x14\n\x10JOB_STATE_FAILED\x10\x04*\x90\x01\n\x08JobStage\x12\x19\n\x15JOB_STAGE_UNSPECIFIED\x10\x00\x12\x16\n\x12JOB_STAGE_FETCHING\x10\x01\x12\x19\n\x15JOB_STAGE_NORMALIZING\x10\x02\x12\x18\n\x14JOB_STAGE_EXTRACTING\x10\x03\x12\x1c\n\x18JOB_STAGE_CANONICALISING\x10\x04\x32\xa0\x03\n\tExtractor\x12P\n\x07\x45xtract\x12!.mise.extractor.v1.ExtractRequest\x1a\".mise.extractor.v1.ExtractResponse\x12P\n\x0cStreamStatus\x12&.mise.extractor.v1.StreamStatusRequest\x1a\x16.mise.extractor.v1.Job0\x01\x12H\n\tGetStatus\x12#.mise.extractor.v1.GetStatusRequest\x1a\x16.mise.extractor.v1.Job\x12V\n\tGetRecipe\x12#.mise.extractor.v1.GetRecipeRequest\x1a$.mise.extractor.v1.GetRecipeResponse\x12M\n\x06Health\x12 .mise.extractor.v1.HealthRequest\x1a!.mise.extractor.v1.HealthResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'extractor_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_JOBSTATE']._serialized_start=636
-  _globals['_JOBSTATE']._serialized_end=765
-  _globals['_JOBSTAGE']._serialized_start=768
-  _globals['_JOBSTAGE']._serialized_end=912
+  _globals['_JOBSTATE']._serialized_start=731
+  _globals['_JOBSTATE']._serialized_end=860
+  _globals['_JOBSTAGE']._serialized_start=863
+  _globals['_JOBSTAGE']._serialized_end=1007
   _globals['_EXTRACTREQUEST']._serialized_start=38
   _globals['_EXTRACTREQUEST']._serialized_end=69
   _globals['_EXTRACTRESPONSE']._serialized_start=71
@@ -43,14 +43,18 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_STREAMSTATUSREQUEST']._serialized_end=181
   _globals['_GETSTATUSREQUEST']._serialized_start=183
   _globals['_GETSTATUSREQUEST']._serialized_end=217
-  _globals['_JOBERROR']._serialized_start=219
-  _globals['_JOBERROR']._serialized_end=260
-  _globals['_JOB']._serialized_start=263
-  _globals['_JOB']._serialized_end=548
-  _globals['_HEALTHREQUEST']._serialized_start=550
-  _globals['_HEALTHREQUEST']._serialized_end=565
-  _globals['_HEALTHRESPONSE']._serialized_start=567
-  _globals['_HEALTHRESPONSE']._serialized_end=633
-  _globals['_EXTRACTOR']._serialized_start=915
-  _globals['_EXTRACTOR']._serialized_end=1243
+  _globals['_GETRECIPEREQUEST']._serialized_start=219
+  _globals['_GETRECIPEREQUEST']._serialized_end=255
+  _globals['_GETRECIPERESPONSE']._serialized_start=257
+  _globals['_GETRECIPERESPONSE']._serialized_end=312
+  _globals['_JOBERROR']._serialized_start=314
+  _globals['_JOBERROR']._serialized_end=355
+  _globals['_JOB']._serialized_start=358
+  _globals['_JOB']._serialized_end=643
+  _globals['_HEALTHREQUEST']._serialized_start=645
+  _globals['_HEALTHREQUEST']._serialized_end=660
+  _globals['_HEALTHRESPONSE']._serialized_start=662
+  _globals['_HEALTHRESPONSE']._serialized_end=728
+  _globals['_EXTRACTOR']._serialized_start=1010
+  _globals['_EXTRACTOR']._serialized_end=1426
 # @@protoc_insertion_point(module_scope)

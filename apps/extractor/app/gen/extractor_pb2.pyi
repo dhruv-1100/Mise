@@ -58,6 +58,20 @@ class GetStatusRequest(_message.Message):
     job_id: str
     def __init__(self, job_id: _Optional[str] = ...) -> None: ...
 
+class GetRecipeRequest(_message.Message):
+    __slots__ = ("video_id",)
+    VIDEO_ID_FIELD_NUMBER: _ClassVar[int]
+    video_id: str
+    def __init__(self, video_id: _Optional[str] = ...) -> None: ...
+
+class GetRecipeResponse(_message.Message):
+    __slots__ = ("recipe_json", "found")
+    RECIPE_JSON_FIELD_NUMBER: _ClassVar[int]
+    FOUND_FIELD_NUMBER: _ClassVar[int]
+    recipe_json: str
+    found: bool
+    def __init__(self, recipe_json: _Optional[str] = ..., found: _Optional[bool] = ...) -> None: ...
+
 class JobError(_message.Message):
     __slots__ = ("code", "message")
     CODE_FIELD_NUMBER: _ClassVar[int]

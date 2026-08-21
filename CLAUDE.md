@@ -4,7 +4,9 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phases 0, 2.1, 3, 4 and 5 complete. Phase 2.3 works from a real YouTube
+**Status:** Phases 0, 2.1, 3, 4, 5 complete; Phase 6.1 (public surface) done —
+paste a URL, watch live stages, get a scalable recipe with cook mode. Accounts
+(6.2) and analytics (6.3) are not started. Phase 2.3 works from a real YouTube
 URL: fetch -> normalize -> extract -> units, exposed as `POST /extract`. Entity
 resolution and the sanity-rule validator are still open, and there is no
 accuracy number until the Phase 2.2 labelled set exists. Phase 1 nearly done: CI
@@ -18,6 +20,11 @@ phases.
 ## Architecture
 
 - `apps/web` — Next.js 15 App Router, TypeScript, Tailwind 4. BFF pattern.
+  Talks to the extractor over gRPC from `lib/extractor.ts`, which is
+  `server-only` — `@grpc/grpc-js` must never reach the browser bundle, which is
+  why the generated stubs are transport-agnostic and the transport is bound
+  there. `/api/jobs/[jobId]/events` bridges the gRPC status stream to SSE,
+  because browsers cannot speak gRPC without a proxy.
   Design tokens live in `app/globals.css`; the design they come from is in
   `docs/design/` (see its README). Build against the tokens, never hardcoded
   values.
@@ -141,7 +148,10 @@ terraform -chdir=infra plan                # needs TF_VAR_* creds; see infra/REA
   fresh codegen output, so a formatter rewriting a stub would fail that check
   on every run with no way to fix it.
 - `apps/web` — Playwright for cook-mode flows only. Don't unit test React.
-  `pnpm test` is a documented no-op in `apps/web` until Phase 6.
+  `pnpm test` is still a no-op there; the Playwright specs are outstanding.
+- **Relative imports in `packages/*` carry no `.js` suffix.** tsc accepts both
+  under `moduleResolution: bundler`, but Next's webpack does not map `.js` back
+  to `.ts`, so a suffixed import builds under typecheck and fails the build.
 
 ## Style
 

@@ -77,8 +77,8 @@
   --color-cook-ink: var(--cook-ink);
   --color-cook-ink-soft: var(--cook-ink-soft);
 
-  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
-  --font-sans: Manrope, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-display-loaded), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-sans-loaded), ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);

@@ -11,6 +11,7 @@
     "test": "node -e \"console.log('[@mise/web] no tests yet — Playwright cook-mode specs land in Phase 6')\""
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.4",
     "@mise/scaling": "workspace:*",
     "@mise/schema": "workspace:*",
     "next": "15.5.23",
@@ -25,6 +26,7 @@
     "@types/react-dom": "^19.2.0",
     "eslint": "^9.39.1",
     "eslint-config-next": "15.5.23",
+    "server-only": "^0.0.1",
     "tailwindcss": "^4.1.16",
     "typescript": "^5.9.3"
   }
