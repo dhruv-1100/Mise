@@ -1,0 +1,12 @@
+{
+  "jobId": "01JQ8Z3K5M7N9P0Q2R4S6T8V",
+  "videoId": "aaaaaaaaaaa",
+  "state": "failed",
+  "attempt": 3,
+  "queuedAt": "2026-08-20T10:00:00Z",
+  "startedAt": "2026-08-20T10:00:03Z",
+  "finishedAt": "2026-08-20T10:02:11Z",
+  "stage": null,
+  "error": { "code": "llm_unavailable", "message": "every model in the chain failed" },
+  "cached": false
+}

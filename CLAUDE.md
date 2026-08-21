@@ -4,7 +4,8 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phases 0, 2.1 and 3 complete. Phase 2.3 works from a real YouTube
+**Status:** Phases 0, 2.1, 3 complete; Phase 5 mobile-only (desktop widths
+outstanding). Phase 2.3 works from a real YouTube
 URL: fetch -> normalize -> extract -> units, exposed as `POST /extract`. Entity
 resolution and the sanity-rule validator are still open, and there is no
 accuracy number until the Phase 2.2 labelled set exists. Phase 1 nearly done: CI
@@ -18,11 +19,15 @@ phases.
 ## Architecture
 
 - `apps/web` — Next.js 15 App Router, TypeScript, Tailwind 4. BFF pattern.
+  Design tokens live in `app/globals.css`; the design they come from is in
+  `docs/design/` (see its README). Build against the tokens, never hardcoded
+  values.
 - `apps/extractor` — Python 3.12 + FastAPI, managed by uv. Owns all LLM calls
   and parsing. The web app never calls an LLM directly. Pipeline stages are pure
   functions in `app/`: `normalize.py` (strip description noise), `extract.py`
   (LLM extraction and mapping onto the contract), `units.py` (canonical
-  grams/ml), `evaluation.py` (scoring against ground truth). All LLM access
+  grams/ml), `evaluation.py` (scoring against ground truth), `queue.py`
+  (Redis-backed jobs: idempotency, retry/DLQ, cache, backpressure). All LLM access
   goes through the `LlmProvider` protocol in
   `app/llm.py` — nothing else imports the SDK, and tests use `FakeProvider` so
   they run offline. Entity resolution is not built yet.

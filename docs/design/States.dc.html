@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+    :root{
+      --ground:oklch(0.982 0.008 78);
+      --surface:oklch(0.962 0.012 76);
+      --sunk:oklch(0.930 0.016 74);
+      --line:oklch(0.876 0.018 72);
+      --ink:oklch(0.235 0.018 55);
+      --ink-soft:oklch(0.478 0.020 60);
+      --ink-faint:oklch(0.628 0.018 65);
+      --accent:oklch(0.565 0.168 42);
+      --accent-deep:oklch(0.455 0.150 40);
+      --accent-wash:oklch(0.945 0.032 48);
+      --herb:oklch(0.565 0.168 148);
+      --herb-wash:oklch(0.948 0.030 150);
+      --warn:oklch(0.565 0.168 82);
+      --warn-wash:oklch(0.952 0.040 86);
+      /* Text tier. Matched oklch lightness makes accent/herb/warn perceptually
+         even, but WCAG luminance is not perceptual lightness, so herb and warn
+         land at 4.01:1 and 4.37:1 on ground — under the 4.5 small text needs.
+         The matched trio stays for fills and icons (3:1); text uses these. */
+      --herb-text:oklch(0.500 0.168 148);
+      --warn-text:oklch(0.495 0.168 82);
+      --cook-ground:oklch(0.185 0.014 55);
+      --cook-surface:oklch(0.245 0.016 55);
+      --cook-ink:oklch(0.966 0.010 80);
+      --cook-ink-soft:oklch(0.760 0.014 70);
+      --r-sm:6px; --r-md:10px; --r-lg:16px; --r-full:999px;
+      --shadow:0 1px 2px oklch(0.235 0.018 55 / 0.06), 0 8px 24px oklch(0.235 0.018 55 / 0.06);
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;background:var(--ground);color:var(--ink);
+      font-family:Manrope,ui-sans-serif,system-ui,sans-serif;
+      -webkit-font-smoothing:antialiased;}
+    a{color:var(--accent-deep);text-decoration:none;}
+    a:hover{color:var(--accent);}
+    .serif{font-family:"Instrument Serif",Georgia,serif;font-weight:400;}
+    .phone{width:390px;min-height:844px;background:var(--ground);
+      display:flex;flex-direction:column;position:relative;overflow:hidden;}
+    .pad{padding:0 20px;}
+    .tap{min-height:44px;min-width:44px;}
+    .eyebrow{font-size:12px;font-weight:600;letter-spacing:0.09em;
+      text-transform:uppercase;color:var(--ink-faint);}
+</style>
+</helmet>
+<div class="phone" style="min-height:1100px;"><div class="pad" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:14px;padding-bottom:14px;"><div style="display:flex;align-items:center;gap:10px;"><div style="width:26px;height:26px;border-radius:var(--r-sm);background:var(--accent);display:flex;align-items:center;justify-content:center;color:var(--ground);font-family:'Instrument Serif',Georgia,serif;font-size:18px;line-height:1;">M</div><span class="serif" style="font-size:20px;letter-spacing:-0.01em;">Empty &amp; error states</span></div></div><div class="pad" style="padding-top:6px;display:flex;flex-direction:column;gap:14px;"><p style="margin:0 0 2px;font-size:14px;line-height:1.55;color:var(--ink-soft);">Every one of these is a real outcome the pipeline can return, not an invented sad path.</p><div style="border:1px solid var(--line);border-radius:var(--r-lg);padding:18px;background:var(--surface);"><div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--warn-wash);color:var(--warn);display:flex;align-items:center;justify-content:center;margin-bottom:13px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg></div><div style="font-size:17px;font-weight:600;line-height:1.3;">This video has no written recipe</div><div style="font-size:14px;line-height:1.55;color:var(--ink-soft);margin-top:6px;">The creator links to their own site instead of listing ingredients. We will not guess a recipe from the title &mdash; that would be worse than nothing.</div><div style="margin-top:10px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:var(--ink-faint);">insufficient_source_material &middot; description_is_link_only</div><button class="tap" style="margin-top:14px;height:44px;padding:0 18px;border:1px solid var(--line);background:var(--ground);border-radius:var(--r-md);font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;">Open the creator&#39;s page</button></div><div style="border:1px solid var(--line);border-radius:var(--r-lg);padding:18px;background:var(--surface);"><div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--warn-wash);color:var(--warn);display:flex;align-items:center;justify-content:center;margin-bottom:13px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg></div><div style="font-size:17px;font-weight:600;line-height:1.3;">We are over today&#39;s YouTube quota</div><div style="font-size:14px;line-height:1.55;color:var(--ink-soft);margin-top:6px;">This resets at midnight Pacific. Anything already extracted still works.</div><div style="margin-top:10px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:var(--ink-faint);">quota_exceeded &middot; HTTP 429</div><button class="tap" style="margin-top:14px;height:44px;padding:0 18px;border:1px solid var(--line);background:var(--ground);border-radius:var(--r-md);font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;">Try again later</button></div><div style="border:1px solid var(--line);border-radius:var(--r-lg);padding:18px;background:var(--surface);"><div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--warn-wash);color:var(--warn);display:flex;align-items:center;justify-content:center;margin-bottom:13px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></svg></div><div style="font-size:17px;font-weight:600;line-height:1.3;">That is not a YouTube link</div><div style="font-size:14px;line-height:1.55;color:var(--ink-soft);margin-top:6px;">Paste a youtube.com or youtu.be address. Other sites are not supported.</div><div style="margin-top:10px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:var(--ink-faint);">not_a_youtube_url &middot; HTTP 400</div></div><div style="border:1px solid var(--line);border-radius:var(--r-lg);padding:18px;background:var(--surface);"><div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--warn-wash);color:var(--warn);display:flex;align-items:center;justify-content:center;margin-bottom:13px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg></div><div style="font-size:17px;font-weight:600;line-height:1.3;">Extraction failed after three tries</div><div style="font-size:14px;line-height:1.55;color:var(--ink-soft);margin-top:6px;">The model was unavailable each time. The job is kept so it can be retried once the service recovers.</div><div style="margin-top:10px;font-family:ui-monospace,SFMono-Regular,monospace;font-size:11px;color:var(--ink-faint);">failed &middot; attempt 3 &middot; dead-lettered</div><button class="tap" style="margin-top:14px;height:44px;padding:0 18px;border:1px solid var(--line);background:var(--ground);border-radius:var(--r-md);font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;">Retry</button></div><div style="border:1px solid var(--line);border-radius:var(--r-lg);padding:18px;background:var(--surface);"><div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--accent-wash);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:13px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 6.6a5 5 0 0 0-7.1 0L12 8.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 22l8.8-8.3a5 5 0 0 0 0-7.1z"></path></svg></div><div style="font-size:17px;font-weight:600;line-height:1.3;">Nothing saved yet</div><div style="font-size:14px;line-height:1.55;color:var(--ink-soft);margin-top:6px;">Recipes you save live here, scaled the way you left them.</div><button class="tap" style="margin-top:14px;height:44px;padding:0 18px;border:1px solid var(--line);background:var(--ground);border-radius:var(--r-md);font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;">Browse the feed</button></div></div></div>
+</x-dc>
+
+</body>
+</html>

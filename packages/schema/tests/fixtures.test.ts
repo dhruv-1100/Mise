@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { ZodType } from "zod";
 
-import { ExtractionResult, Recipe } from "../src/index.js";
+import { ExtractionResult, Job, Recipe } from "../src/index.js";
 
 const FIXTURES = join(fileURLToPath(new URL(".", import.meta.url)), "..", "fixtures");
 
@@ -55,3 +55,4 @@ function suite(kind: string, schema: ZodType): void {
 
 suite("recipe", Recipe);
 suite("result", ExtractionResult);
+suite("job", Job);

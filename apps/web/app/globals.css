@@ -1,28 +1,110 @@
 @import "tailwindcss";
 
-/* Design tokens land in Phase 5 (Claude Design handoff). Keep this file
-   deliberately bare until then so there is nothing to un-learn. */
+/* Mise design tokens — Phase 5.1.
+   Source of truth is docs/design/ (the design canvas); this file is the
+   handoff. Change them together or the app stops matching the design.
+
+   Direction, from BUILD_PLAN.md §5.1: a warm neutral base with one saturated
+   accent, chosen against the default blue-and-gray that reads as template.
+   Values are oklch so the palette stays perceptually even when it shifts. */
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  /* Surfaces, warm rather than neutral grey */
+  --ground: oklch(0.982 0.008 78);
+  --surface: oklch(0.962 0.012 76);
+  --sunk: oklch(0.930 0.016 74);
+  --line: oklch(0.876 0.018 72);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Ink */
+  --ink: oklch(0.235 0.018 55);
+  --ink-soft: oklch(0.478 0.020 60);
+  --ink-faint: oklch(0.628 0.018 65); /* 3.4:1 — 12px bold and up only */
+
+  /* Accent and semantics. These three share lightness 0.565 and chroma 0.168
+     and differ only in hue, so meaning is carried by hue and no one of them
+     shouts louder than the others. */
+  --accent: oklch(0.565 0.168 42);
+  --accent-deep: oklch(0.455 0.150 40);
+  --accent-wash: oklch(0.945 0.032 48);
+  --herb: oklch(0.565 0.168 148);
+  --herb-wash: oklch(0.948 0.030 150);
+  --warn: oklch(0.565 0.168 82);
+  --warn-wash: oklch(0.952 0.040 86);
+
+  /* Text tier for the semantic colours.
+     Matched oklch lightness makes them perceptually even, but WCAG luminance
+     is NOT perceptual lightness: herb and warn measure 4.0:1 and 4.4:1 on
+     ground, under the 4.5 small text requires. The matched trio above stays
+     for fills and icons, where 3:1 applies; these carry text. */
+  --herb-text: oklch(0.500 0.168 148);
+  --warn-text: oklch(0.495 0.168 82);
+
+  /* Cook mode. Inverted for glare, and the constraint that set the type scale:
+     legible at arm's length, on a counter, with wet hands. */
+  --cook-ground: oklch(0.185 0.014 55);
+  --cook-surface: oklch(0.245 0.016 55);
+  --cook-ink: oklch(0.966 0.010 80);
+  --cook-ink-soft: oklch(0.760 0.014 70);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* Cook-mode contract. Enforced in review, not just documented. */
+  --cook-body-min: 18px;
+  --tap-min: 44px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-sunk: var(--sunk);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-accent: var(--accent);
+  --color-accent-deep: var(--accent-deep);
+  --color-accent-wash: var(--accent-wash);
+  --color-herb: var(--herb);
+  --color-herb-text: var(--herb-text);
+  --color-herb-wash: var(--herb-wash);
+  --color-warn: var(--warn);
+  --color-warn-text: var(--warn-text);
+  --color-warn-wash: var(--warn-wash);
+  --color-cook-ground: var(--cook-ground);
+  --color-cook-surface: var(--cook-surface);
+  --color-cook-ink: var(--cook-ink);
+  --color-cook-ink-soft: var(--cook-ink-soft);
+
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-sans: Manrope, ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
 }
 
+/* No dark-mode block yet. Cook mode is the dark surface this product needs,
+   and it is a deliberate mode rather than a system preference — a recipe page
+   flipping dark because of an OS setting is not the same design. Revisit in
+   Phase 6 with real usage. */
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Respect the setting; cook mode animates progress and timers. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
