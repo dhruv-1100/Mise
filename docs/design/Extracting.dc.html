@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+    :root{
+      --ground:oklch(0.982 0.008 78);
+      --surface:oklch(0.962 0.012 76);
+      --sunk:oklch(0.930 0.016 74);
+      --line:oklch(0.876 0.018 72);
+      --ink:oklch(0.235 0.018 55);
+      --ink-soft:oklch(0.478 0.020 60);
+      --ink-faint:oklch(0.628 0.018 65);
+      --accent:oklch(0.565 0.168 42);
+      --accent-deep:oklch(0.455 0.150 40);
+      --accent-wash:oklch(0.945 0.032 48);
+      --herb:oklch(0.565 0.168 148);
+      --herb-wash:oklch(0.948 0.030 150);
+      --warn:oklch(0.565 0.168 82);
+      --warn-wash:oklch(0.952 0.040 86);
+      /* Text tier. Matched oklch lightness makes accent/herb/warn perceptually
+         even, but WCAG luminance is not perceptual lightness, so herb and warn
+         land at 4.01:1 and 4.37:1 on ground — under the 4.5 small text needs.
+         The matched trio stays for fills and icons (3:1); text uses these. */
+      --herb-text:oklch(0.500 0.168 148);
+      --warn-text:oklch(0.495 0.168 82);
+      --cook-ground:oklch(0.185 0.014 55);
+      --cook-surface:oklch(0.245 0.016 55);
+      --cook-ink:oklch(0.966 0.010 80);
+      --cook-ink-soft:oklch(0.760 0.014 70);
+      --r-sm:6px; --r-md:10px; --r-lg:16px; --r-full:999px;
+      --shadow:0 1px 2px oklch(0.235 0.018 55 / 0.06), 0 8px 24px oklch(0.235 0.018 55 / 0.06);
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;background:var(--ground);color:var(--ink);
+      font-family:Manrope,ui-sans-serif,system-ui,sans-serif;
+      -webkit-font-smoothing:antialiased;}
+    a{color:var(--accent-deep);text-decoration:none;}
+    a:hover{color:var(--accent);}
+    .serif{font-family:"Instrument Serif",Georgia,serif;font-weight:400;}
+    .phone{width:390px;min-height:844px;background:var(--ground);
+      display:flex;flex-direction:column;position:relative;overflow:hidden;}
+    .pad{padding:0 20px;}
+    .tap{min-height:44px;min-width:44px;}
+    .eyebrow{font-size:12px;font-weight:600;letter-spacing:0.09em;
+      text-transform:uppercase;color:var(--ink-faint);}
+</style>
+</helmet>
+<div class="phone"><div class="pad" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:14px;padding-bottom:14px;"><div style="display:flex;align-items:center;gap:10px;"><div style="width:26px;height:26px;border-radius:var(--r-sm);background:var(--accent);display:flex;align-items:center;justify-content:center;color:var(--ground);font-family:'Instrument Serif',Georgia,serif;font-size:18px;line-height:1;">M</div><span class="serif" style="font-size:20px;letter-spacing:-0.01em;">Extracting</span></div></div><div class="pad" style="padding-top:40px;"><div class="eyebrow" style="margin-bottom:10px;">Chef Ranveer Brar</div><h1 class="serif" style="font-size:30px;line-height:1.12;margin:0 0 6px;letter-spacing:-0.015em;">Aloo Paratha</h1><div style="font-size:14px;color:var(--ink-soft);">Usually takes about 20 seconds.</div><div style="height:4px;border-radius:var(--r-full);background:var(--sunk);margin:26px 0 30px;overflow:hidden;"><div style="width:64%;height:100%;background:var(--accent);border-radius:var(--r-full);"></div></div><div style="display:flex;flex-direction:column;gap:22px;"><div style="display:flex;gap:14px;align-items:flex-start;"><div style="width:26px;height:26px;border-radius:var(--r-full);background:var(--herb);color:var(--ground);display:flex;align-items:center;justify-content:center;flex:none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 12 9 17 20 6"></polyline></svg></div><div style="padding-top:2px;"><div style="font-size:16px;font-weight:500;color:var(--ink-soft);">Fetching the description</div><div style="font-size:12px;color:var(--ink-faint);margin-top:2px;font-variant-numeric:tabular-nums;">stage: fetching</div></div></div><div style="display:flex;gap:14px;align-items:flex-start;"><div style="width:26px;height:26px;border-radius:var(--r-full);background:var(--herb);color:var(--ground);display:flex;align-items:center;justify-content:center;flex:none;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 12 9 17 20 6"></polyline></svg></div><div style="padding-top:2px;"><div style="font-size:16px;font-weight:500;color:var(--ink-soft);">Stripping links and sponsor reads</div><div style="font-size:12px;color:var(--ink-faint);margin-top:2px;font-variant-numeric:tabular-nums;">stage: normalizing</div></div></div><div style="display:flex;gap:14px;align-items:flex-start;"><div style="width:26px;height:26px;border-radius:var(--r-full);border:2px solid var(--accent);flex:none;display:flex;align-items:center;justify-content:center;"><div style="width:9px;height:9px;border-radius:var(--r-full);background:var(--accent);"></div></div><div style="padding-top:2px;"><div style="font-size:16px;font-weight:600;color:var(--ink);">Reading the recipe</div><div style="font-size:12px;color:var(--ink-faint);margin-top:2px;font-variant-numeric:tabular-nums;">stage: extracting</div></div></div><div style="display:flex;gap:14px;align-items:flex-start;"><div style="width:26px;height:26px;border-radius:var(--r-full);border:2px solid var(--line);flex:none;"></div><div style="padding-top:2px;"><div style="font-size:16px;font-weight:500;color:var(--ink-faint);">Converting to grams and millilitres</div><div style="font-size:12px;color:var(--ink-faint);margin-top:2px;font-variant-numeric:tabular-nums;">stage: canonicalising</div></div></div></div><div style="margin-top:36px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;"><div style="font-size:13px;color:var(--ink-soft);line-height:1.55;">Stage names rather than a spinner, because a spinner tells you nothing when a step is slow. This is the live <span style="font-family:ui-monospace,monospace;font-size:12px;">stage</span> field from the job record.</div></div></div><div class="pad" style="margin-top:auto;padding-bottom:28px;"><button class="tap" style="width:100%;height:48px;border:1px solid var(--line);background:transparent;color:var(--ink-soft);border-radius:var(--r-md);font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;">Cancel</button></div></div>
+</x-dc>
+
+</body>
+</html>

@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+    :root{
+      --ground:oklch(0.982 0.008 78);
+      --surface:oklch(0.962 0.012 76);
+      --sunk:oklch(0.930 0.016 74);
+      --line:oklch(0.876 0.018 72);
+      --ink:oklch(0.235 0.018 55);
+      --ink-soft:oklch(0.478 0.020 60);
+      --ink-faint:oklch(0.628 0.018 65);
+      --accent:oklch(0.565 0.168 42);
+      --accent-deep:oklch(0.455 0.150 40);
+      --accent-wash:oklch(0.945 0.032 48);
+      --herb:oklch(0.565 0.168 148);
+      --herb-wash:oklch(0.948 0.030 150);
+      --warn:oklch(0.565 0.168 82);
+      --warn-wash:oklch(0.952 0.040 86);
+      /* Text tier. Matched oklch lightness makes accent/herb/warn perceptually
+         even, but WCAG luminance is not perceptual lightness, so herb and warn
+         land at 4.01:1 and 4.37:1 on ground — under the 4.5 small text needs.
+         The matched trio stays for fills and icons (3:1); text uses these. */
+      --herb-text:oklch(0.500 0.168 148);
+      --warn-text:oklch(0.495 0.168 82);
+      --cook-ground:oklch(0.185 0.014 55);
+      --cook-surface:oklch(0.245 0.016 55);
+      --cook-ink:oklch(0.966 0.010 80);
+      --cook-ink-soft:oklch(0.760 0.014 70);
+      --r-sm:6px; --r-md:10px; --r-lg:16px; --r-full:999px;
+      --shadow:0 1px 2px oklch(0.235 0.018 55 / 0.06), 0 8px 24px oklch(0.235 0.018 55 / 0.06);
+    }
+    *{box-sizing:border-box;}
+    body{margin:0;background:var(--ground);color:var(--ink);
+      font-family:Manrope,ui-sans-serif,system-ui,sans-serif;
+      -webkit-font-smoothing:antialiased;}
+    a{color:var(--accent-deep);text-decoration:none;}
+    a:hover{color:var(--accent);}
+    .serif{font-family:"Instrument Serif",Georgia,serif;font-weight:400;}
+    .phone{width:390px;min-height:844px;background:var(--ground);
+      display:flex;flex-direction:column;position:relative;overflow:hidden;}
+    .pad{padding:0 20px;}
+    .tap{min-height:44px;min-width:44px;}
+    .eyebrow{font-size:12px;font-weight:600;letter-spacing:0.09em;
+      text-transform:uppercase;color:var(--ink-faint);}
+</style>
+</helmet>
+<div class="phone"><div style="height:200px;background:var(--sunk);position:relative;display:flex;align-items:center;justify-content:center;flex:none;"><div style="width:56px;height:56px;border-radius:var(--r-full);background:var(--ground);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);color:var(--accent);"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg></div><div class="tap" style="position:absolute;top:12px;left:12px;width:44px;height:44px;border-radius:var(--r-full);background:oklch(0.982 0.008 78 / 0.9);display:flex;align-items:center;justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><polyline points="11 18 5 12 11 6"></polyline></svg></div></div><div class="pad" style="padding-top:20px;"><h1 class="serif" style="font-size:34px;line-height:1.08;margin:0 0 10px;letter-spacing:-0.02em;">Aloo Paratha</h1><div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;"><div style="width:28px;height:28px;border-radius:var(--r-full);background:var(--accent-wash);flex:none;"></div><a href="#" style="font-size:14px;font-weight:600;">Chef Ranveer Brar</a><span style="font-size:14px;color:var(--ink-faint);">&middot; 8:00</span></div><div style="background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;"><div><div class="eyebrow" style="margin-bottom:2px;">Servings</div><div style="font-size:13px;color:var(--ink-soft);">scaled {{factorLabel}} from 4</div></div><div style="display:flex;align-items:center;gap:6px;"><button class="tap" onClick="{{dec}}" aria-label="Fewer servings" style="width:44px;height:44px;border-radius:var(--r-md);border:1px solid var(--line);background:var(--ground);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><div style="min-width:44px;text-align:center;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;">{{servings}}</div><button class="tap" onClick="{{inc}}" aria-label="More servings" style="width:44px;height:44px;border-radius:var(--r-md);border:1px solid var(--line);background:var(--ground);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div></div><sc-if value="{{hasAdvisories}}" hint-placeholder-val="{{true}}"><div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"><sc-for list="{{advisories}}" as="a" hint-placeholder-count="2"><div style="display:flex;gap:10px;background:var(--warn-wash);border-radius:var(--r-md);padding:11px 13px;"><span style="color:var(--warn);flex:none;margin-top:1px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg></span><span style="font-size:13px;line-height:1.5;color:var(--ink);">{{a}}</span></div></sc-for></div></sc-if><div class="eyebrow" style="margin:30px 0 4px;">For the dough</div><sc-for list="{{dough}}" as="i" hint-placeholder-count="5"><div style="display:flex;gap:14px;align-items:baseline;padding:11px 0;border-bottom:1px solid var(--line);"><div style="flex:none;width:88px;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;">{{i.amount}}</div><div style="flex:1;min-width:0;"><div style="font-size:16px;line-height:1.35;">{{i.name}}</div><sc-if value="{{i.prep}}" hint-placeholder-val="{{true}}"><div style="font-size:13px;color:var(--ink-faint);margin-top:1px;">{{i.prep}}</div></sc-if><sc-if value="{{i.note}}" hint-placeholder-val="{{true}}"><div style="font-size:12px;color:var(--warn-text);margin-top:3px;font-weight:600;">{{i.note}}</div></sc-if></div></div></sc-for><div class="eyebrow" style="margin:26px 0 4px;">For the filling</div><sc-for list="{{filling}}" as="i" hint-placeholder-count="5"><div style="display:flex;gap:14px;align-items:baseline;padding:11px 0;border-bottom:1px solid var(--line);"><div style="flex:none;width:88px;font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;">{{i.amount}}</div><div style="flex:1;min-width:0;"><div style="font-size:16px;line-height:1.35;">{{i.name}}</div><sc-if value="{{i.prep}}" hint-placeholder-val="{{true}}"><div style="font-size:13px;color:var(--ink-faint);margin-top:1px;">{{i.prep}}</div></sc-if><sc-if value="{{i.note}}" hint-placeholder-val="{{true}}"><div style="font-size:12px;color:var(--warn-text);margin-top:3px;font-weight:600;">{{i.note}}</div></sc-if></div></div></sc-for><div style="display:flex;gap:10px;margin:28px 0 32px;"><button class="tap" style="flex:1;height:52px;border:0;border-radius:var(--r-md);background:var(--accent);color:var(--ground);font-family:inherit;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22c4 0 7-2.7 7-6.5 0-4.5-4.5-6-4.5-9.5 0 0-3 1.5-3 5 0-1.5-1.5-3-1.5-3S8 10.5 8 13c0-1-1-2-1-2-.6 1.2-2 2.6-2 4.5C5 19.3 8 22 12 22z"></path></svg>Start cooking</button><button class="tap" aria-label="Save recipe" style="width:52px;height:52px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--ground);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;cursor:pointer;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 6.6a5 5 0 0 0-7.1 0L12 8.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 22l8.8-8.3a5 5 0 0 0 0-7.1z"></path></svg></button></div></div></div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":390,"height":1180}}'>
+
+class Component extends DCLogic {
+  constructor(p){ super(p); this.state = { servings: 4 }; }
+
+  // Mirrors packages/scaling: 3^k = 2.2 solved for k.
+  sub(){ return Math.log(2.2) / Math.log(3); }
+
+  fmt(qty, unit){
+    if (qty === null) return '';
+    const metric = ['g','ml','kg','l'];
+    if (metric.indexOf(unit) >= 0){
+      const v = unit === 'g' || unit === 'ml' ? Math.round(qty) : Math.round(qty*100)/100;
+      return v + ' ' + unit;
+    }
+    const glyph = [[1/8,'⅛'],[1/4,'¼'],[1/3,'⅓'],[3/8,'⅜'],[1/2,'½'],
+                   [5/8,'⅝'],[2/3,'⅔'],[3/4,'¾'],[7/8,'⅞']];
+    const whole = Math.floor(qty); let frac = qty - whole; let out = null;
+    if (frac > 0.98) return (whole + 1) + (unit ? ' ' + unit : '');
+    if (frac < 0.02) out = whole === 0 ? null : String(whole);
+    else {
+      let best = null, d = 0.03;
+      for (const [v,g] of glyph){ const dd = Math.abs(frac - v); if (dd < d){ d = dd; best = g; } }
+      if (best) out = whole === 0 ? best : (whole + best);
+    }
+    if (out === null) out = String(Math.round(qty*100)/100);
+    return out + (unit ? ' ' + unit : '');
+  }
+
+  scale(ing, factor){
+    if (ing.qty === null) return { text: ing.qtyText, note: null };
+    if (ing.cls === 'DISCRETE'){
+      const exact = ing.qty * factor;
+      const rounded = Math.max(1, Math.round(exact));
+      const note = Math.abs(rounded - exact) > 0.01
+        ? 'rounded from ' + (Math.round(exact*100)/100) : null;
+      return { text: this.fmt(rounded, ing.unit), note: note };
+    }
+    if (ing.cls === 'SUBLINEAR'){
+      const v = ing.qty * Math.pow(factor, this.sub());
+      return { text: this.fmt(v, ing.unit), note: factor > 2 ? 'taste before adding more' : null };
+    }
+    return { text: this.fmt(ing.qty * factor, ing.unit), note: null };
+  }
+
+  renderVals(){
+    const base = 4;
+    const s = this.state.servings;
+    const factor = s / base;
+
+    const dough = [
+      { name:'whole wheat flour', qty:2, unit:'cup', cls:'LINEAR' },
+      { name:'gram flour', qty:2, unit:'tbsp', cls:'LINEAR' },
+      { name:'ghee', qty:2, unit:'tbsp', cls:'LINEAR' },
+      { name:'carom seeds', prep:'ajwain', qty:0.5, unit:'tsp', cls:'SUBLINEAR' },
+      { name:'salt', qty:1, unit:'tsp', cls:'SUBLINEAR' },
+      { name:'water', qty:null, qtyText:'as required', cls:'LINEAR' }
+    ];
+    const filling = [
+      { name:'potatoes', prep:'boiled and grated', qty:2, unit:null, cls:'DISCRETE' },
+      { name:'green chillies', prep:'finely chopped', qty:2, unit:null, cls:'DISCRETE' },
+      { name:'ginger', prep:'grated', qty:1, unit:'inch', cls:'LINEAR' },
+      { name:'coriander leaves', qty:1, unit:'tbsp', cls:'LINEAR' },
+      { name:'chilli powder', qty:1, unit:'tsp', cls:'SUBLINEAR' },
+      { name:'garam masala', qty:1, unit:'tsp', cls:'SUBLINEAR' },
+      { name:'cumin powder', qty:0.5, unit:'tsp', cls:'SUBLINEAR' },
+      { name:'amchur powder', qty:0.25, unit:'tsp', cls:'SUBLINEAR' },
+      { name:'salt', qty:null, qtyText:'to taste', cls:'SUBLINEAR' }
+    ];
+    const map = (xs) => xs.map((i) => {
+      const r = this.scale(i, factor);
+      return { name:i.name, prep:i.prep || null, amount:r.text, note:r.note,
+               vague:i.qty === null, sub:i.cls === 'SUBLINEAR' };
+    });
+
+    const advisories = [];
+    if (factor > 2) advisories.push('Seasoning does not scale with volume — the spices below grew by about ' +
+      (Math.round(Math.pow(factor, this.sub())*10)/10) + '×, not ' + (Math.round(factor*10)/10) + '×.');
+    if (factor >= 2) advisories.push('Use a wider tawa, or cook in two batches.');
+
+    return {
+      servings: s,
+      factorLabel: (Math.round(factor*100)/100) + '×',
+      dough: map(dough),
+      filling: map(filling),
+      advisories: advisories,
+      hasAdvisories: advisories.length > 0,
+      dec: () => this.setState({ servings: Math.max(1, this.state.servings - 1) }),
+      inc: () => this.setState({ servings: Math.min(24, this.state.servings + 1) })
+    };
+  }
+}
+
+</script>
+</body>
+</html>

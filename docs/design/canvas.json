@@ -1,0 +1,26 @@
+{
+  "artboards": [
+    { "file": "Tokens.dc.html",     "title": "Design tokens",        "x": 0,    "y": 0,    "w": 900, "h": 1460 },
+
+    { "file": "Main.dc.html",       "title": "Landing",              "x": 0,    "y": 1580, "w": 390, "h": 844 },
+    { "file": "Extracting.dc.html", "title": "Extraction in progress","x": 450,  "y": 1580, "w": 390, "h": 844 },
+    { "file": "Recipe.dc.html",     "title": "Recipe + serving stepper","x": 900,"y": 1580, "w": 390, "h": 1180 },
+    { "file": "CookMode.dc.html",   "title": "Cook mode",            "x": 1350, "y": 1580, "w": 390, "h": 844 },
+
+    { "file": "Creator.dc.html",    "title": "Creator page",         "x": 0,    "y": 2840, "w": 390, "h": 900 },
+    { "file": "Feed.dc.html",       "title": "Feed / discovery",     "x": 450,  "y": 2840, "w": 390, "h": 900 },
+    { "file": "Saved.dc.html",      "title": "Saved recipes",        "x": 900,  "y": 2840, "w": 390, "h": 844 },
+    { "file": "States.dc.html",     "title": "Empty + error states", "x": 1350, "y": 2840, "w": 390, "h": 1120 }
+  ],
+  "annotations": [
+    { "id": "note-direction", "x": 960, "y": 0, "w": 320,
+      "text": "Direction comes from BUILD_PLAN §5.1: warm neutral base, one saturated accent, deliberately not the Tailwind blue-and-gray that reads as template.\n\naccent / herb / warn share lightness 0.565 and chroma 0.168 and differ only in hue, so semantic colour is carried by hue rather than by one of them shouting." },
+    { "id": "note-cookmode", "x": 1800, "y": 1580, "w": 320,
+      "text": "Cook mode is the constraint that shaped the type scale: legible at arm's length, on a counter, with wet hands.\n\n28px step text, 18px floor everywhere, 44px minimum targets, inverted for glare. Designed first; the browsing screens scale down from it rather than the reverse." },
+    { "id": "note-stepper", "x": 1800, "y": 2200, "w": 320,
+      "text": "The serving stepper actually runs the Phase 3 engine — try it. Salt and spices grow by factor^0.7176, potatoes round to whole units and say so, and 'to taste' never becomes a number.\n\nAdvisories appear inline, never in a modal." },
+    { "id": "note-states", "x": 1800, "y": 2840, "w": 320,
+      "text": "Every error here is a real outcome the pipeline returns, with its actual code. 'No written recipe' is the Hebbars Kitchen case from ADR 0001 — roughly one video in five, and the one place the product must refuse rather than invent." }
+  ],
+  "launch": { "view": "canvas" }
+}
