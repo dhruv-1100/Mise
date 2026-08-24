@@ -2,6 +2,7 @@ import "server-only";
 
 import { Recipe } from "@mise/schema";
 import { getRecipe } from "@/lib/extractor";
+import { getOverride } from "@/lib/overrides";
 
 /**
  * Fetch a recipe by video id.
@@ -10,8 +11,17 @@ import { getRecipe } from "@/lib/extractor";
  * extracted. Parsed through the shared contract rather than trusted: the
  * recipe crossed a process boundary as JSON, and zod is what makes it a Recipe
  * again on this side.
+ *
+ * A verified creator's correction wins over the extractor's output. Checked
+ * first rather than merged afterwards: the creator's version is a whole recipe,
+ * not a patch, so there is nothing to merge and no order-of-application
+ * question to get wrong. `getOverride` returns null when the database is not
+ * configured, so this path is unchanged on a deployment with no accounts.
  */
 export async function loadRecipe(videoId: string): Promise<Recipe | null> {
+  const override = await getOverride(videoId).catch(() => null);
+  if (override !== null) return override;
+
   const result = await getRecipe(videoId).catch(() => null);
   if (result === null || !result.found) return null;
 

@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { auth, isAuthConfigured } from "@/auth";
+import { NoteEditor } from "@/components/NoteEditor";
+import { SaveButton } from "@/components/SaveButton";
 import { ServingStepper } from "@/components/ServingStepper";
+import { TrackRecipeView } from "@/components/TrackRecipeView";
+import { canEditChannel, countCooks, getNote, isSaved } from "@/lib/accounts";
 import { loadRecipe, toJsonLd } from "@/lib/recipe";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mise.example";
@@ -27,6 +32,68 @@ export async function generateMetadata({
     },
     alternates: { canonical: `${SITE}/r/${videoId}` },
   };
+}
+
+/**
+ * Everything on this page that depends on who is looking.
+ *
+ * NOT wrapped in <Suspense>, and that is deliberate. It was, for the obvious
+ * reason: let the recipe paint without waiting on a session lookup and four
+ * queries. But a client component inside that boundary never hydrated — the
+ * Save button and the notes field rendered correctly, looked right, and did
+ * nothing at all, because React attached no handlers to them.
+ *
+ * Reproduced in both `next dev` and a production build on Next 15.5.23 /
+ * React 19, and it is not the sibling JSON-LD <script>, which was the first
+ * suspect and was ruled out by removing it. The trigger is the boundary itself
+ * wrapping an async server component on this version.
+ *
+ * The cost of dropping it is small: this page already awaits loadRecipe() over
+ * gRPC before rendering anything, so the shell was never streaming early, and
+ * the four queries below run in parallel on one connection. Worth revisiting
+ * with partial prerendering, which is the arrangement that actually wants a
+ * boundary here — but not before checking, in a real browser, that what is
+ * inside it responds to a click.
+ */
+async function PersonalActions({ videoId, channelId }: { videoId: string; channelId: string }) {
+  const user = isAuthConfigured ? (await auth())?.user : undefined;
+
+  if (user === undefined) {
+    return (
+      <div className="mt-6">
+        <SaveButton videoId={videoId} initialSaved={false} signedIn={false} />
+      </div>
+    );
+  }
+
+  const [saved, note, cooked, canEdit] = await Promise.all([
+    isSaved(user.id, videoId),
+    getNote(user.id, videoId),
+    countCooks(user.id, videoId),
+    canEditChannel(user.id, channelId),
+  ]);
+
+  return (
+    <>
+      <div className="mt-6 flex items-center gap-3">
+        <SaveButton videoId={videoId} initialSaved={saved} signedIn />
+        {cooked > 0 && (
+          <span className="text-[13px] text-ink-faint">
+            cooked {cooked} {cooked === 1 ? "time" : "times"}
+          </span>
+        )}
+        {canEdit && (
+          <Link
+            href={`/r/${videoId}/edit`}
+            className="ml-auto flex h-11 items-center text-[15px] font-semibold text-accent-deep"
+          >
+            Edit extraction
+          </Link>
+        )}
+      </div>
+      <NoteEditor videoId={videoId} initialNote={note} />
+    </>
+  );
 }
 
 export default async function RecipePage({
@@ -62,6 +129,12 @@ export default async function RecipePage({
         />
       </div>
 
+      <TrackRecipeView
+        videoId={recipe.videoId}
+        ingredientCount={recipe.ingredients.length}
+        stepCount={recipe.steps.length}
+      />
+
       <div className="px-5">
         <h1 className="mb-2.5 mt-5 font-display text-[34px] leading-[1.08] tracking-[-0.02em]">
           {recipe.title}
@@ -77,6 +150,8 @@ export default async function RecipePage({
           </a>
           <span className="text-ink-faint"> · on YouTube</span>
         </p>
+
+        <PersonalActions videoId={videoId} channelId={recipe.creator.channelId} />
 
         <ServingStepper recipe={recipe} />
 

@@ -4,10 +4,12 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phases 0, 2.1, 3, 4, 5 complete; Phase 6.1 (public surface) done —
-paste a URL, watch live stages, get a scalable recipe with cook mode. Accounts
-(6.2) and analytics (6.3) are not started. Phase 2.3 works from a real YouTube
-URL: fetch -> normalize -> extract -> units, exposed as `POST /extract`. Entity
+**Status:** Phases 0, 2.1, 3, 4, 5 complete; Phase 6 done — paste a URL, watch
+live stages, get a scalable recipe with cook mode; sign in with Google to save,
+note and count cooks; verified creators can correct extractions of their own
+videos; seven product events firing with retention cohorts defined.
+Phase 2.3 works from a real YouTube URL: fetch -> normalize -> extract -> units,
+exposed as `POST /extract`. Entity
 resolution and the sanity-rule validator are still open, and there is no
 accuracy number until the Phase 2.2 labelled set exists. Phase 1 nearly done: CI
 is green and all five providers are provisioned via Terraform — Neon, Upstash,
@@ -52,6 +54,14 @@ phases.
 - `infra/` — Terraform (Phase 1), all applied and live: Neon, Upstash, Vercel,
   Grafana and Cloud Run. Railway was dropped for having no free tier; see
   `infra/README.md`.
+
+Accounts live entirely in `apps/web`: `auth.ts` (Auth.js v5, Google, JWT
+sessions over database users), `lib/db.ts` (Neon over HTTPS — no ORM, hand
+written SQL), `lib/accounts.ts` (every query touching a signed-in person, in one
+file so the `WHERE user_id` on each is auditable at a glance), and
+`lib/analytics/` (PostHog behind an `AnalyticsSink`, mirroring `LlmProvider`).
+The two ADRs that govern it are 0003 (token lifecycle) and 0004 (retention
+cohorts); read both before touching either.
 - SQL migrations live in `apps/extractor/migrations/`. pgvector is enabled there
   because no Terraform provider can do it.
 
@@ -73,6 +83,11 @@ compiles them via `transpilePackages`, so there is no build-ordering problem.
 - No `any` in TypeScript (`@typescript-eslint/no-explicit-any` is an error). No
   bare `except:` in Python (ruff `E722`).
 - Every new endpoint gets a Prometheus counter and histogram (from Phase 7).
+- **A role never authorises a write.** `session.user.role` decides what to
+  render; ownership decides what may be written. Anything mutating re-derives
+  permission from the database, and never from a document the caller controls.
+- **No analytics property carries content.** Ids, counts, booleans, durations.
+  An analytics vendor is persistence like any other.
 - Attribution is not optional: creator name, channel link, and an embedded
   player on every recipe page.
 
@@ -83,6 +98,8 @@ pnpm 11 requires Node 22.13+, so do not bump it without bumping Node first.
 
 ```bash
 pnpm install            # once, at the repo root
+pnpm --filter @mise/web migrate   # apply apps/extractor/migrations/*.sql
+                                  # (--dry to list). Runs over HTTPS, not 5432.
 pnpm dev                # Next.js dev server on :3000
 pnpm build              # production build
 pnpm test               # vitest; fails if packages/scaling drops below 100% branches
@@ -147,8 +164,17 @@ terraform -chdir=infra plan                # needs TF_VAR_* creds; see infra/REA
   `src/gen/` are excluded from ruff and eslint: CI compares the tree against
   fresh codegen output, so a formatter rewriting a stub would fail that check
   on every run with no way to fix it.
-- `apps/web` — Playwright for cook-mode flows only. Don't unit test React.
-  `pnpm test` is still a no-op there; the Playwright specs are outstanding.
+- `apps/web` — vitest for logic that fails silently (the migration splitter, the
+  open-redirect guard, the analytics contract); Playwright for cook-mode flows,
+  still outstanding. Don't unit test React.
+- **Hydration is not covered by any of the above.** A `<Suspense>` boundary
+  around an async server component left its client children rendered, correct
+  looking and completely inert — no handlers attached — in both dev and a
+  production build. Typecheck, lint and every unit test passed. If a change
+  adds or moves a boundary, open the page in a real browser and click the thing.
+- **Verify against the real dependency where one exists.** Every statement in
+  `lib/accounts.ts` was run against the live Neon database, cascades and the
+  claim race included, before any of it was trusted.
 - **Relative imports in `packages/*` carry no `.js` suffix.** tsc accepts both
   under `moduleResolution: bundler`, but Next's webpack does not map `.js` back
   to `.ts`, so a suffixed import builds under typecheck and fails the build.

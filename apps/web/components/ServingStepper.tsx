@@ -2,7 +2,9 @@
 
 import { scale, type ScaledIngredient } from "@mise/scaling";
 import type { Recipe } from "@mise/schema";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { track } from "@/lib/analytics/client";
 
 /**
  * The signature interaction (BUILD_PLAN.md §5.3).
@@ -16,6 +18,32 @@ export function ServingStepper({ recipe }: { recipe: Recipe }) {
   const [servings, setServings] = useState(base ?? 4);
 
   const result = useMemo(() => scale(recipe, servings), [recipe, servings]);
+
+  /**
+   * Report where the stepper came to rest, not every tap on the way.
+   *
+   * Going from 4 to 12 is eight taps and one decision. Firing per tap would
+   * make the median "servings_changed" a delta of one and bury the thing worth
+   * knowing — how far people actually scale, which is the question this whole
+   * package exists to answer.
+   */
+  const settled = useRef(base ?? 4);
+  useEffect(() => {
+    if (base === null || servings === settled.current) return;
+    const timer = setTimeout(() => {
+      track({
+        name: "servings_changed",
+        properties: {
+          videoId: recipe.videoId,
+          from: settled.current,
+          to: servings,
+          factor: Math.round((servings / base) * 1000) / 1000,
+        },
+      });
+      settled.current = servings;
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [servings, base, recipe.videoId]);
 
   if (base === null) {
     // Scaling needs a yield to scale from. Saying so beats inventing four.
