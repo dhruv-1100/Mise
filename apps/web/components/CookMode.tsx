@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import type { Recipe } from "@mise/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,12 +13,34 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * a counter, by someone with wet hands. 28px step text, an 18px floor, 44px
  * targets, inverted for glare.
  */
-export function CookMode({ recipe }: { recipe: Recipe }) {
+export function CookMode({ recipe, signedIn }: { recipe: Recipe; signedIn: boolean }) {
+  const router = useRouter();
   const [index, setIndex] = useState(0);
+  const [finishing, setFinishing] = useState(false);
   const step = recipe.steps[index];
   const total = recipe.steps.length;
 
   const wakeLock = useWakeLock();
+
+  /**
+   * Finishing is an event, not a dead end.
+   *
+   * The last step used to leave a button reading "Done" that was disabled —
+   * the one moment worth recording, and there was nothing to press. A completed
+   * cook is the strongest product signal this app has (BUILD_PLAN.md §1 counts
+   * cook-mode sessions), so it is written down and the person is returned to
+   * the recipe.
+   *
+   * The count is best-effort: a failed request must never trap someone in cook
+   * mode over a piece of bookkeeping.
+   */
+  const finish = useCallback(async () => {
+    setFinishing(true);
+    if (signedIn) {
+      await fetch(`/api/recipes/${recipe.videoId}/cooked`, { method: "POST" }).catch(() => null);
+    }
+    router.push(`/r/${recipe.videoId}`);
+  }, [recipe.videoId, router, signedIn]);
 
   const next = useCallback(
     () => setIndex((i) => Math.min(total - 1, i + 1)),
@@ -103,11 +126,11 @@ export function CookMode({ recipe }: { recipe: Recipe }) {
         </button>
         <button
           type="button"
-          onClick={next}
-          disabled={index === total - 1}
+          onClick={index === total - 1 ? () => void finish() : next}
+          disabled={finishing}
           className="h-[60px] flex-1 rounded-md bg-cook-ink text-lg font-bold text-cook-ground disabled:opacity-40"
         >
-          {index === total - 1 ? "Done" : "Next step"}
+          {index === total - 1 ? (finishing ? "Saving…" : "Done") : "Next step"}
         </button>
       </div>
     </main>

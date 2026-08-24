@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
+import { auth, isAuthConfigured } from "@/auth";
+import { NoteEditor } from "@/components/NoteEditor";
+import { SaveButton } from "@/components/SaveButton";
 import { ServingStepper } from "@/components/ServingStepper";
+import { canEditChannel, countCooks, getNote, isSaved } from "@/lib/accounts";
 import { loadRecipe, toJsonLd } from "@/lib/recipe";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mise.example";
@@ -27,6 +32,55 @@ export async function generateMetadata({
     },
     alternates: { canonical: `${SITE}/r/${videoId}` },
   };
+}
+
+/**
+ * Everything on this page that depends on who is looking.
+ *
+ * Split out and wrapped in Suspense so the recipe itself — the part that
+ * matters for SEO and for someone who is not signed in — renders without
+ * waiting on a session lookup and three queries. The fallback reserves the
+ * height so the method section does not jump when this resolves.
+ */
+async function PersonalActions({ videoId, channelId }: { videoId: string; channelId: string }) {
+  const user = isAuthConfigured ? (await auth())?.user : undefined;
+
+  if (user === undefined) {
+    return (
+      <div className="mt-6">
+        <SaveButton videoId={videoId} initialSaved={false} signedIn={false} />
+      </div>
+    );
+  }
+
+  const [saved, note, cooked, canEdit] = await Promise.all([
+    isSaved(user.id, videoId),
+    getNote(user.id, videoId),
+    countCooks(user.id, videoId),
+    canEditChannel(user.id, channelId),
+  ]);
+
+  return (
+    <>
+      <div className="mt-6 flex items-center gap-3">
+        <SaveButton videoId={videoId} initialSaved={saved} signedIn />
+        {cooked > 0 && (
+          <span className="text-[13px] text-ink-faint">
+            cooked {cooked} {cooked === 1 ? "time" : "times"}
+          </span>
+        )}
+        {canEdit && (
+          <Link
+            href={`/r/${videoId}/edit`}
+            className="ml-auto flex h-11 items-center text-[15px] font-semibold text-accent-deep"
+          >
+            Edit extraction
+          </Link>
+        )}
+      </div>
+      <NoteEditor videoId={videoId} initialNote={note} />
+    </>
+  );
 }
 
 export default async function RecipePage({
@@ -77,6 +131,10 @@ export default async function RecipePage({
           </a>
           <span className="text-ink-faint"> · on YouTube</span>
         </p>
+
+        <Suspense fallback={<div className="mt-6 h-11" />}>
+          <PersonalActions videoId={videoId} channelId={recipe.creator.channelId} />
+        </Suspense>
 
         <ServingStepper recipe={recipe} />
 
