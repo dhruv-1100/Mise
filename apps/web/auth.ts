@@ -4,6 +4,7 @@ import Google from "next-auth/providers/google";
 
 import { adapterClient, isConfigured } from "@/lib/db";
 import { getRole, recordClaim, type Role } from "@/lib/accounts";
+import { captureServerSide } from "@/lib/analytics/server";
 import { fetchOwnedChannel, YOUTUBE_READONLY_SCOPE } from "@/lib/youtube";
 
 /**
@@ -68,6 +69,24 @@ const config: NextAuthConfig = {
     : [],
 
   pages: { signIn: "/signin" },
+
+  /**
+   * `signup`, fired exactly once per person.
+   *
+   * BUILD_PLAN.md §6.3 lists it first, and §1 warns that retention is the one
+   * number that cannot be reconstructed later — a D30 cohort needs to know the
+   * day the account was created, from the day it was created.
+   *
+   * `createUser` is the only place that knows. The browser sees an identical
+   * redirect for a new account and a returning sign-in, and `signIn` fires for
+   * both. This fires when Auth.js has just inserted the row.
+   */
+  events: {
+    async createUser({ user }) {
+      if (user.id === undefined) return;
+      await captureServerSide(user.id, { name: "signup", properties: { method: "google" } });
+    },
+  },
 
   callbacks: {
     /**

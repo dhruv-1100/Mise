@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 
 import { auth, isAuthConfigured } from "@/auth";
 import { NoteEditor } from "@/components/NoteEditor";
 import { SaveButton } from "@/components/SaveButton";
 import { ServingStepper } from "@/components/ServingStepper";
+import { TrackRecipeView } from "@/components/TrackRecipeView";
 import { canEditChannel, countCooks, getNote, isSaved } from "@/lib/accounts";
 import { loadRecipe, toJsonLd } from "@/lib/recipe";
 
@@ -37,10 +37,23 @@ export async function generateMetadata({
 /**
  * Everything on this page that depends on who is looking.
  *
- * Split out and wrapped in Suspense so the recipe itself — the part that
- * matters for SEO and for someone who is not signed in — renders without
- * waiting on a session lookup and three queries. The fallback reserves the
- * height so the method section does not jump when this resolves.
+ * NOT wrapped in <Suspense>, and that is deliberate. It was, for the obvious
+ * reason: let the recipe paint without waiting on a session lookup and four
+ * queries. But a client component inside that boundary never hydrated — the
+ * Save button and the notes field rendered correctly, looked right, and did
+ * nothing at all, because React attached no handlers to them.
+ *
+ * Reproduced in both `next dev` and a production build on Next 15.5.23 /
+ * React 19, and it is not the sibling JSON-LD <script>, which was the first
+ * suspect and was ruled out by removing it. The trigger is the boundary itself
+ * wrapping an async server component on this version.
+ *
+ * The cost of dropping it is small: this page already awaits loadRecipe() over
+ * gRPC before rendering anything, so the shell was never streaming early, and
+ * the four queries below run in parallel on one connection. Worth revisiting
+ * with partial prerendering, which is the arrangement that actually wants a
+ * boundary here — but not before checking, in a real browser, that what is
+ * inside it responds to a click.
  */
 async function PersonalActions({ videoId, channelId }: { videoId: string; channelId: string }) {
   const user = isAuthConfigured ? (await auth())?.user : undefined;
@@ -116,6 +129,12 @@ export default async function RecipePage({
         />
       </div>
 
+      <TrackRecipeView
+        videoId={recipe.videoId}
+        ingredientCount={recipe.ingredients.length}
+        stepCount={recipe.steps.length}
+      />
+
       <div className="px-5">
         <h1 className="mb-2.5 mt-5 font-display text-[34px] leading-[1.08] tracking-[-0.02em]">
           {recipe.title}
@@ -132,9 +151,7 @@ export default async function RecipePage({
           <span className="text-ink-faint"> · on YouTube</span>
         </p>
 
-        <Suspense fallback={<div className="mt-6 h-11" />}>
-          <PersonalActions videoId={videoId} channelId={recipe.creator.channelId} />
-        </Suspense>
+        <PersonalActions videoId={videoId} channelId={recipe.creator.channelId} />
 
         <ServingStepper recipe={recipe} />
 

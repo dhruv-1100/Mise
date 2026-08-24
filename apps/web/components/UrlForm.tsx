@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
+import { track } from "@/lib/analytics/client";
+
 /** Messages for the codes the BFF can return. Never a raw error string. */
 const MESSAGES: Record<string, string> = {
   not_a_youtube_url: "That is not a YouTube link. Paste a youtube.com or youtu.be address.",
@@ -24,6 +26,7 @@ export function UrlForm() {
     if (busy || video.trim().length === 0) return;
     setBusy(true);
     setError(null);
+    const startedAt = Date.now();
 
     try {
       const res = await fetch("/api/extract", {
@@ -39,6 +42,19 @@ export function UrlForm() {
         return;
       }
       // A cached video is already done, so skip the progress screen entirely.
+      // It still counts as an extraction from the person's point of view —
+      // they asked for a recipe and got one — and `cached` is what keeps the
+      // two apart in the latency numbers.
+      if (body.job.cached) {
+        track({
+          name: "recipe_extracted",
+          properties: {
+            videoId: body.job.videoId,
+            cached: true,
+            waitedMs: Date.now() - startedAt,
+          },
+        });
+      }
       router.push(body.job.cached ? `/r/${body.job.videoId}` : `/j/${body.job.jobId}`);
     } catch {
       setError("We could not reach the server. Check your connection.");

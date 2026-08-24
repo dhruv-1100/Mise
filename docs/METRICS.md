@@ -38,14 +38,29 @@ if extraction is unreliable.
 
 ## Product
 
-| Metric | Current |
-| --- | --- |
-| Registered users | — |
-| DAU / WAU | — |
-| D1 / D7 / D30 retention | — |
-| Saves per user | — |
-| Cook-mode sessions started / completed | — |
-| Extractions per week | — |
+Instrumented in Phase 6.3. Cohort definitions are fixed in
+`docs/adr/0004-analytics-and-retention.md` — read them before quoting any
+retention number, because the definition is half of what the number means.
+
+Day 0 is the UTC date of `signup`. **Active** means any product event, never a
+bare pageview. D1/D7/D30 are *exactly* that day, not "on or after".
+
+| Metric | Source event(s) | Current |
+| --- | --- | --- |
+| Registered users | `signup` | — |
+| Activated users (got at least one recipe) | `recipe_extracted` | — |
+| DAU / WAU | any product event | — |
+| D1 / D7 / D30 **returning** | any product event | — / — / — |
+| D1 / D7 / D30 **cooking** | `cook_mode_started` | — / — / — |
+| Saves per user | `recipe_saved` | — |
+| Cook-mode sessions started / completed | `cook_mode_started`, `cook_mode_completed` | — / — |
+| Median scale factor | `servings_changed.factor` | — |
+| Extractions per week | `recipe_extracted` | — |
+| Cache-hit share of extractions | `recipe_extracted.cached` | — |
+| Median wait before a recipe appears | `recipe_extracted.waitedMs` | — |
+
+Both retention rows are reported together, always. The returning number is the
+comparable one; the cooking number is the true one.
 
 ## Infrastructure
 
@@ -93,3 +108,4 @@ trustworthy; the percentages are not. Re-measure on the Phase 2.2 50-video set.
 | 2026-08-17 | File created. Phase 0 scaffold complete; nothing measured yet. |
 | 2026-08-17 | Phase 2.1 spike run. Captions unreachable without OAuth (401, not the predicted 403); descriptions carry more than expected. See `docs/adr/0001-content-sourcing.md`. |
 | 2026-08-18 | Extraction pipeline running end to end on Gemini over the 5 cached descriptions. 4/5 produced schema-valid recipes; the 5th correctly refused. Normalization removes 20-88% of lines before billing. No accuracy number yet — that needs the Phase 2.2 labelled set. See `docs/adr/0002-llm-provider.md`. |
+| 2026-08-24 | Phase 6.2/6.3. Accounts, RBAC and verified creator claims shipped; seven product events wired and cohort definitions fixed in `docs/adr/0004-analytics-and-retention.md`. **Every Product cell is still empty on purpose: nothing is deployed and there are no users.** The clock on D30 starts at the first real signup, not today. |

@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { track } from "@/lib/analytics/client";
 
 /** Stage order and the words a person sees. Not the enum names. */
 const STAGES = [
@@ -42,6 +44,11 @@ export function JobProgress({ jobId }: { jobId: string }) {
   const [job, setJob] = useState<JobShape | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
 
+  // How long someone actually stared at this screen. The interesting half of
+  // the extraction latency story — the queue's own timings are Prometheus's
+  // job in Phase 7, but this is the number that decides whether they stay.
+  const startedAt = useRef(Date.now());
+
   useEffect(() => {
     const source = new EventSource(`/api/jobs/${jobId}/events`);
 
@@ -50,6 +57,14 @@ export function JobProgress({ jobId }: { jobId: string }) {
       setJob(next);
       if (name(next.state, "state") === "JOB_STATE_SUCCEEDED") {
         source.close();
+        track({
+          name: "recipe_extracted",
+          properties: {
+            videoId: next.videoId,
+            cached: false,
+            waitedMs: Date.now() - startedAt.current,
+          },
+        });
         router.push(`/r/${next.videoId}`);
       }
       if (name(next.state, "state") === "JOB_STATE_FAILED") {
