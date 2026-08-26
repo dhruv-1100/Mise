@@ -4,17 +4,22 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phases 0, 2.1, 3, 4, 5 complete; Phase 6 done — paste a URL, watch
-live stages, get a scalable recipe with cook mode; sign in with Google to save,
-note and count cooks; verified creators can correct extractions of their own
-videos; seven product events firing with retention cohorts defined.
+**Status:** Phases 0, 2.1, 3, 4, 5 complete. Phase 6 is built — paste a URL,
+watch live stages, get a scalable recipe with cook mode; sign in with Google to
+save, note and count cooks; verified creators can correct extractions of their
+own videos; seven product events firing with retention cohorts defined. Two of
+its exit criteria remain open: **Lighthouse has never been run**, and nothing
+is live until `deploy.yml` runs once.
 Phase 2.3 works from a real YouTube URL: fetch -> normalize -> extract -> units,
 exposed as `POST /extract`. Entity
 resolution and the sanity-rule validator are still open, and there is no
 accuracy number until the Phase 2.2 labelled set exists. Phase 1 nearly done: CI
 is green and all five providers are provisioned via Terraform — Neon, Upstash,
-Vercel, Grafana and Cloud Run — with a clean plan. The extractor image is still
-the placeholder; CI does not build or deploy it yet. The headline finding so far is
+Vercel, Grafana and Cloud Run — with a clean plan. `deploy.yml` now builds the extractor image and
+rolls a Cloud Run revision after CI passes on main, authenticating with
+Workload Identity Federation so no key is stored anywhere — but it has not run
+yet, so Cloud Run still serves the placeholder. See
+`docs/adr/0005-cloud-run-topology.md`. The headline finding so far is
 `docs/adr/0001-content-sourcing.md` — captions are unreachable without creator
 OAuth, so descriptions are the primary source. See `BUILD_PLAN.md` for all 12
 phases.
@@ -37,6 +42,11 @@ phases.
   grams/ml), `evaluation.py` (scoring against ground truth), `queue.py`
   (Redis-backed jobs: idempotency, retry/DLQ, cache, backpressure),
   `worker.py` (drains the queue), `grpc_server.py` (the BFF-facing surface).
+  `server.py` is the production entrypoint and the only thing that starts those
+  last two: the container runs `python -m app.server`, which binds gRPC to
+  `$PORT` and runs the worker pool in the same process. The FastAPI app in
+  `main.py` is the local development path and is **not** exposed in production —
+  Cloud Run routes one port per container, and the BFF speaks gRPC.
   All LLM access goes through the `LlmProvider` protocol in
   `app/llm.py` — nothing else imports the SDK, and tests use `FakeProvider` so
   they run offline. Entity resolution is not built yet.
@@ -137,6 +147,20 @@ uv run python scripts/eval.py --json /tmp/eval.json --fail-under-gate
 terraform -chdir=infra init
 terraform -chdir=infra validate
 terraform -chdir=infra plan                # needs TF_VAR_* creds; see infra/README.md
+```
+
+Deployment. The extractor image is built and rolled by
+`.github/workflows/deploy.yml` when CI passes on `main`; the web app is built by
+Vercel's git integration. Neither needs a key — CI federates into Google with
+OIDC. Setup and the five repository variables are in `infra/README.md`.
+
+```bash
+# What the deploy workflow does last, runnable by hand against any address.
+cd apps/extractor
+uv run --frozen python scripts/smoke_grpc.py HOST:443
+
+# Roll back to the previous revision.
+gcloud run services update-traffic mise-prod-extractor --to-revisions=PREVIOUS=100
 ```
 
 ## Testing

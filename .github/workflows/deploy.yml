@@ -1,0 +1,139 @@
+name: Deploy
+
+# Deploys only what CI already passed.
+#
+# `workflow_run` fires when the CI workflow finishes on main, and the job below
+# refuses to run unless it finished successfully. The alternative — deploying on
+# every push to main — races CI and can ship a revision whose tests are still
+# running, or that failed them.
+#
+# The checkout below is pinned to the SHA CI tested, not to the tip of main. By
+# the time a deploy starts, main may already have moved.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Two deploys of the same service race: whichever `gcloud run deploy` finishes
+# last wins, which may be the older image. Never cancel in progress — a
+# half-finished deploy is worse than a queued one.
+concurrency:
+  group: deploy-extractor
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Required for Workload Identity Federation: this is what lets the runner ask
+  # GitHub for the OIDC token it exchanges for Google credentials. Without it
+  # the auth step fails with a message about the token endpoint, which reads
+  # like a network problem and is not one.
+  id-token: write
+
+# Actions pinned to exact released versions, never moving major tags — see the
+# note in ci.yml and docs/INCIDENTS.md. Every tag here was resolved against the
+# GitHub API before being written.
+
+jobs:
+  extractor:
+    name: extractor → Cloud Run
+    runs-on: ubuntu-latest
+
+    # workflow_dispatch has no workflow_run context, so allow it through; from
+    # workflow_run, demand success. A failed CI run still triggers this
+    # workflow — `types: [completed]` means finished, not passed.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    env:
+      IMAGE: ${{ vars.EXTRACTOR_IMAGE_REPO }}/extractor
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          # The SHA CI tested. Empty for workflow_dispatch, where checkout
+          # falls back to the ref the run was started from.
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # Keyless. There is no service account key in this repository, and adding
+      # one would defeat the point — see infra/github.tf.
+      - id: auth
+        uses: google-github-actions/auth@v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+
+      - name: Authorise Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - uses: docker/setup-buildx-action@v4.3.0
+
+      - name: Build and push
+        uses: docker/build-push-action@v7.3.0
+        with:
+          context: apps/extractor
+          push: true
+          # Tagged with the commit, and `latest` as a convenience. The deploy
+          # below uses the SHA tag: `latest` is ambiguous the moment two builds
+          # overlap, and a rollback needs an immutable name to roll back to.
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          # The dependency layer is the expensive one and changes only when
+          # uv.lock does, which is rarely.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Only the image changes here. Environment variables, scaling, probes and
+      # the service account are Terraform's, and naming them again would make
+      # this workflow a second source of truth that silently wins.
+      - name: Deploy revision
+        run: |
+          gcloud run deploy "${{ vars.EXTRACTOR_SERVICE }}" \
+            --image "${{ env.IMAGE }}:${{ github.sha }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --quiet
+
+      - name: Resolve the service address
+        id: address
+        run: |
+          URL=$(gcloud run services describe "${{ vars.EXTRACTOR_SERVICE }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --format 'value(status.url)')
+          echo "address=${URL#https://}:443" >> "$GITHUB_OUTPUT"
+
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: apps/extractor/uv.lock
+
+      # A green deploy means the container bound its port. It does not mean the
+      # BFF can talk to it: a missing h2c port name, a wrong entrypoint or an
+      # absent REDIS_URL all produce a healthy-looking revision that fails every
+      # call. One real RPC over TLS covers all three.
+      - name: Smoke test the deployed revision
+        working-directory: apps/extractor
+        run: |
+          uv sync --frozen
+          uv run --frozen python scripts/smoke_grpc.py "${{ steps.address.outputs.address }}"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Deployed"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Service | \`${{ vars.EXTRACTOR_SERVICE }}\` |"
+            echo "| Image | \`${{ env.IMAGE }}:${{ github.sha }}\` |"
+            echo "| Address | \`${{ steps.address.outputs.address }}\` |"
+            echo
+            echo "Rollback: \`gcloud run services update-traffic ${{ vars.EXTRACTOR_SERVICE }} --to-revisions=PREVIOUS=100\`"
+          } >> "$GITHUB_STEP_SUMMARY"

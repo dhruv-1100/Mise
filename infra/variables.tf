@@ -181,3 +181,43 @@ variable "grafana_stack_region_slug" {
   type        = string
   default     = "prod-us-east-3"
 }
+
+// ---------------------------------------------------------------------------
+// Web app runtime configuration (Phase 6).
+//
+// Each of these defaults to empty and is skipped when empty rather than being
+// written as a blank value. A blank AUTH_SECRET is worse than an absent one:
+// Auth.js would start and sign tokens with it.
+// ---------------------------------------------------------------------------
+
+variable "auth_secret" {
+  description = "Auth.js JWT signing/encryption secret. Generate with: openssl rand -base64 32"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "google_oauth_client_id" {
+  description = "Google OAuth 2.0 client id for sign-in. Created in the GCP console, not by Terraform — see docs/adr/0003-auth-and-sessions.md."
+  type        = string
+  default     = ""
+}
+
+variable "google_oauth_client_secret" {
+  description = "Google OAuth 2.0 client secret."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "posthog_key" {
+  description = "PostHog project API key. Empty disables analytics entirely; the sink falls back to a no-op."
+  type        = string
+  default     = ""
+}
+
+variable "site_url" {
+  description = "Public origin of the web app. Canonical URLs, Open Graph tags and the OAuth callback are built from it."
+  type        = string
+  default     = ""
+}

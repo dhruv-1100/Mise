@@ -12,6 +12,8 @@
 
 import "server-only";
 
+import { isLoopback } from "@/lib/grpc-address";
+
 import {
   ChannelCredentials,
   Client,
@@ -144,10 +146,15 @@ function client(): ExtractorClient {
     // TypeScript cannot see the methods the definition adds. The narrowing goes
     // through unknown deliberately — the shape is guaranteed by the generated
     // ExtractorDefinition, not by the constructor's declared type.
-    cached = new Ctor(
-      ADDRESS,
-      ChannelCredentials.createInsecure(),
-    ) as unknown as ExtractorClient;
+    // Cloud Run terminates TLS on 443 and speaks h2c behind it; an insecure
+    // channel to it fails as UNAVAILABLE, which is indistinguishable from the
+    // service being down. createSsl() with no arguments uses the system root
+    // certificates, which is what a public Cloud Run URL presents.
+    const creds = isLoopback(ADDRESS)
+      ? ChannelCredentials.createInsecure()
+      : ChannelCredentials.createSsl();
+
+    cached = new Ctor(ADDRESS, creds) as unknown as ExtractorClient;
   }
   return cached;
 }
