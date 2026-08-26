@@ -96,3 +96,34 @@ output "grafana_metrics_token" {
   value       = grafana_cloud_access_policy_token.metrics_write.token
   sensitive   = true
 }
+
+// ---------------------------------------------------------------------------
+// CI deployment. These three are what .github/workflows/deploy.yml needs, and
+// none of them is a secret — the whole point of Workload Identity Federation is
+// that there is no credential to keep. Set them as repository variables (not
+// secrets) with:
+//
+//   terraform -chdir=infra output -raw github_wif_provider
+//   terraform -chdir=infra output -raw github_deployer_service_account
+//   terraform -chdir=infra output -raw extractor_service_name
+// ---------------------------------------------------------------------------
+
+output "github_wif_provider" {
+  description = "Workload Identity provider resource name, for google-github-actions/auth."
+  value       = google_iam_workload_identity_pool_provider.github.name
+}
+
+output "github_deployer_service_account" {
+  description = "Service account CI impersonates to build and deploy."
+  value       = google_service_account.deployer.email
+}
+
+output "extractor_service_name" {
+  description = "Cloud Run service name the deploy workflow updates."
+  value       = google_cloud_run_v2_service.extractor.name
+}
+
+output "extractor_grpc_address" {
+  description = "host:443 for the BFF's EXTRACTOR_GRPC_ADDRESS. Cloud Run terminates TLS, so this is not the :50051 of local dev."
+  value       = "${replace(google_cloud_run_v2_service.extractor.uri, "https://", "")}:443"
+}

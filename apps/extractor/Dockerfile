@@ -44,7 +44,16 @@ USER mise
 ENV PORT=8080
 EXPOSE 8080
 
-# Single worker on purpose. Extraction is I/O-bound on the LLM call, so async
-# concurrency inside one process is the right shape; horizontal scaling is Cloud
-# Run's job. Phase 4 moves this work onto a queue anyway.
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# app.server, not uvicorn.
+#
+# The BFF speaks gRPC, and Cloud Run routes traffic to exactly one port per
+# container. `app.server` puts the gRPC surface on $PORT and runs the worker
+# pool in the same process; the FastAPI app remains the local development path
+# (see CLAUDE.md) and is not exposed in production.
+#
+# Exec form (a JSON array) rather than a shell string: with a shell wrapper the
+# shell is PID 1, SIGTERM never reaches Python, and every scale-down becomes a
+# SIGKILL ten seconds later with in-flight RPCs cut mid-call. Exec form cannot
+# expand ${PORT}, which is exactly right here — app.server reads it from the
+# environment itself, so nothing needs a shell.
+CMD ["python", "-m", "app.server"]

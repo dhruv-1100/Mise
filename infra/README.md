@@ -149,13 +149,17 @@ The `database_url` and `database_url_pooled` outputs build the real connection
 string for `mise_app` against `mise`. `owner_database_url` exposes the owner
 credential for migrations and admin, and should never reach the application.
 
-### Cloud Run starts on a placeholder image
+### Cloud Run's image is CI's, everything else is Terraform's
 
-`google_cloud_run_v2_service` needs an image at create time, and the real one
-does not exist until CI has built it. The service is created on
-`gcr.io/cloudrun/hello`, and `lifecycle.ignore_changes` covers the image field —
-without that, every `terraform apply` would roll production back to
-hello-world. CI owns the image from then on; Terraform owns everything else.
+The service is declared with `gcr.io/cloudrun/hello` and a
+`lifecycle { ignore_changes = [image] }` block. That is not a leftover: CI owns
+the image and Terraform owns everything around it, and without the ignore rule
+every `terraform apply` would roll production back to hello-world.
+
+The first `apply` on a fresh project therefore creates a service running
+hello-world, and the first `deploy.yml` run replaces it. If you are wondering
+why the extractor URL returns a Google welcome page, that is why — deploy has
+not run yet.
 
 ### State is local
 
@@ -177,11 +181,56 @@ autoscaling, Neon history retention beyond the free cap, Cloud Run traffic past
 the monthly free allowance, and any Grafana Cloud usage past the free metric
 series limit.
 
+## Deploying
+
+`.github/workflows/deploy.yml` builds the extractor image and rolls a Cloud Run
+revision after CI passes on `main`. It authenticates with Workload Identity
+Federation, so **there is no service account key to create or store** — see
+`infra/github.tf` and `docs/adr/0005-cloud-run-topology.md`.
+
+After `terraform apply`, set five **repository variables** (Settings → Secrets
+and variables → Actions → Variables). None is a secret; that is the point.
+
+```bash
+terraform -chdir=infra output -raw github_wif_provider              # GCP_WIF_PROVIDER
+terraform -chdir=infra output -raw github_deployer_service_account  # GCP_DEPLOYER_SA
+terraform -chdir=infra output -raw extractor_service_name           # EXTRACTOR_SERVICE
+terraform -chdir=infra output -raw extractor_image_repo             # EXTRACTOR_IMAGE_REPO
+```
+
+plus `GCP_PROJECT_ID` and `GCP_REGION`, which match your `terraform.tfvars`.
+
+The workflow finishes by making one real gRPC call against the deployed URL. A
+green `gcloud run deploy` only proves the container bound its port; the smoke
+test proves the BFF could actually talk to it.
+
+To deploy without waiting for a merge, run the workflow manually
+(Actions → Deploy → Run workflow).
+
+## The web app deploys itself
+
+Vercel builds from the GitHub integration on every push, so no workflow deploys
+the frontend. What it needs is configuration, and `infra/vercel.tf` now sets it:
+`DATABASE_URL` and `EXTRACTOR_GRPC_ADDRESS` are wired from the Neon and Cloud
+Run resources directly, so they cannot go stale when an endpoint changes.
+
+The rest are variables you must supply in `terraform.tfvars`, and each is
+skipped when empty rather than written blank:
+
+| Variable | Where it comes from |
+| --- | --- |
+| `auth_secret` | `openssl rand -base64 32` |
+| `google_oauth_client_id` / `_secret` | GCP console → APIs & Services → Credentials → OAuth client ID (Web application) |
+| `site_url` | your Vercel production URL |
+| `posthog_key` | PostHog → Project settings → Project API key |
+
+A blank `AUTH_SECRET` is worse than an absent one: Auth.js would start and sign
+tokens with it. Absent, it refuses to start.
+
 ## What is deliberately not here
 
-- **`deploy.yml`.** Nothing is provisioned, so there is nothing to deploy to.
 - **DNS / custom domains.** No domain registered yet.
-- **Environment variables on the Vercel project.** They would have to reference
-  outputs that do not exist until after the first apply. Wire them in a second
-  pass, once `terraform output` returns real values. The Cloud Run service does
-  get its keys, because it cannot start without them.
+- **Secret Manager.** The Cloud Run service carries its API keys as plain
+  environment values, readable by anyone with console access to the project.
+  Moving them behind Secret Manager is Phase 8's security pass.
+- **A remote state backend.** Still local, still unlocked — see below.

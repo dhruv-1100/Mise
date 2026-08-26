@@ -62,6 +62,18 @@ resource "google_cloud_run_v2_service" "extractor" {
       // hello-world.
       image = "gcr.io/cloudrun/hello"
 
+      // h2c is what makes this a gRPC service.
+      //
+      // Cloud Run terminates TLS at its frontend and forwards to the container
+      // over cleartext HTTP/2 when the port is named "h2c". Without this name
+      // the frontend downgrades to HTTP/1.1, which cannot carry gRPC at all —
+      // and the failure is a channel that connects and then fails every call,
+      // not a startup error.
+      ports {
+        name           = "h2c"
+        container_port = 8080
+      }
+
       resources {
         limits = {
           cpu    = "1"
@@ -79,9 +91,23 @@ resource "google_cloud_run_v2_service" "extractor" {
         value = var.gemini_api_key
       }
 
+      // The worker pool has no queue without this, and app/server.py refuses to
+      // boot rather than coming up healthy and failing every extraction.
+      env {
+        name  = "REDIS_URL"
+        value = "rediss://default:${upstash_redis_database.main.password}@${upstash_redis_database.main.endpoint}:${upstash_redis_database.main.port}"
+      }
+
+      // A TCP probe, not an HTTP one.
+      //
+      // The container now serves gRPC on this port, so GET /healthz would be
+      // answered by a gRPC server as a protocol error and the revision would
+      // never go healthy. Probing gRPC properly means the grpc.health.v1
+      // service and the grpcio-health-checking dependency; a TCP connect proves
+      // the same thing this needs — the process is up and bound — without it.
       startup_probe {
-        http_get {
-          path = "/healthz"
+        tcp_socket {
+          port = 8080
         }
         initial_delay_seconds = 5
         period_seconds        = 5
