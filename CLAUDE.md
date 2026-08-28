@@ -15,11 +15,13 @@ exposed as `POST /extract`. Entity
 resolution and the sanity-rule validator are still open, and there is no
 accuracy number until the Phase 2.2 labelled set exists. Phase 1 nearly done: CI
 is green and all five providers are provisioned via Terraform — Neon, Upstash,
-Vercel, Grafana and Cloud Run — with a clean plan. `deploy.yml` now builds the extractor image and
-rolls a Cloud Run revision after CI passes on main, authenticating with
-Workload Identity Federation so no key is stored anywhere — but it has not run
-yet, so Cloud Run still serves the placeholder. See
-`docs/adr/0005-cloud-run-topology.md`. The headline finding so far is
+Vercel, Grafana and Cloud Run — with a clean plan. **The extractor is deployed and serving.** `deploy.yml`
+builds the image and rolls a Cloud Run revision after CI passes on main,
+authenticating with Workload Identity Federation so no key is stored anywhere.
+Verified end to end against the live service on 2026-08-28: a real video
+enqueued, drained by the worker and cached, in 91.5s. See
+`docs/adr/0005-cloud-run-topology.md`. The web app is still not deployed — that
+needs the four auth values in `terraform.tfvars` and another apply. The headline finding so far is
 `docs/adr/0001-content-sourcing.md` — captions are unreachable without creator
 OAuth, so descriptions are the primary source. See `BUILD_PLAN.md` for all 12
 phases.

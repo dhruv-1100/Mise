@@ -36,6 +36,17 @@ if extraction is unreliable.
 | Candidate generation (Phase 10) | < 30ms | — | — | — |
 | Ranking, 500 candidates (Phase 10) | < 50ms | — | — | — |
 
+**First production measurement, 2026-08-28.** One extraction against the
+deployed Cloud Run service: **91.5s** end to end, from `Extract` accepted to
+`SUCCEEDED`. A single sample on a cold-ish instance, so it is not a p50 and the
+cells above stay empty — but it is more than double the "10-40 seconds" the
+pipeline's own comments assume, and it would miss the 60s target above.
+
+Worth knowing before Phase 7 sets an SLO against a number nobody has measured.
+The decomposition that matters and does not exist yet: cold start vs. YouTube
+fetch vs. Gemini call. `GetRecipe` on a warm instance round-trips in **0.6s**,
+so the cold start is not the whole story.
+
 ## Product
 
 Instrumented in Phase 6.3. Cohort definitions are fixed in
