@@ -11,6 +11,16 @@ dependencies = [
     # imports it directly, and depending on someone else's dependency graph is
     # how a working build breaks on an unrelated upgrade.
     "httpx>=0.28",
+    # The generated stubs in app/gen/ import google.protobuf directly, and it
+    # reaches the dev environment only through grpcio-tools, which is a dev
+    # dependency used by scripts/codegen.sh. `uv sync --no-dev` in the
+    # Dockerfile therefore dropped it, and the container crashed on import with
+    # ModuleNotFoundError while every local check passed. Same rule as httpx
+    # above: what the code imports, the project declares.
+    #
+    # >=7.35.1 because extractor_pb2.py calls ValidateProtobufRuntimeVersion
+    # with exactly that floor. Regenerating stubs can raise it.
+    "protobuf>=7.35.1",
     "pydantic>=2.9",
     "redis>=5.2",
     "uvicorn>=0.32",

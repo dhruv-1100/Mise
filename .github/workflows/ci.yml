@@ -85,6 +85,20 @@ jobs:
       - name: Test
         run: uv run --frozen pytest
 
+      # The container installs runtime dependencies only. A module that reaches
+      # the dev environment transitively through a dev dependency is present
+      # for every check above and absent in production — which is how the
+      # extractor's first deployed revision crash-looped on
+      # `No module named 'google.protobuf'` with a fully green CI run behind it.
+      #
+      # A separate environment so the dev venv above is left intact.
+      - name: Runtime dependencies are sufficient without dev
+        env:
+          UV_PROJECT_ENVIRONMENT: .venv-runtime
+        run: |
+          uv sync --frozen --no-dev
+          uv run --no-dev --frozen python -c "import app.server"
+
   codegen:
     name: proto stubs are current
     runs-on: ubuntu-latest

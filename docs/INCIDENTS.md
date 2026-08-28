@@ -60,3 +60,64 @@ resolve against the GitHub API before being written.
 **Open:** Branch protection is not enabled on `main`, which is why five PRs
 could merge past a failing check. It has to be set in the repository settings
 and cannot be committed to the repo.
+
+---
+
+## 2026-08-28 — first deployed revision crash-looped: `No module named 'google.protobuf'`
+
+**Impact:** No users — nothing was public yet. The extractor's first two real
+Cloud Run revisions (`00003`, `00004`) never became ready, so the service kept
+serving the `gcr.io/cloudrun/hello` placeholder and every gRPC call returned
+UNAVAILABLE. Roughly ten minutes of deploy attempts, entirely self-inflicted.
+
+**Detected by:** A failing deploy job whose error was misread twice before the
+container logs were read. The job said only "Process completed with exit code 1"
+and the Docker build step was green, which sent the first two hypotheses in the
+wrong direction — including one about IPv6 binding that a test then disproved.
+The revision list and `gcloud run services logs read` gave the answer in one
+line. **Read the logs before forming the third hypothesis.**
+
+**Root cause:** `app/gen/extractor_pb2.py` imports `google.protobuf` directly,
+but `protobuf` was never declared in `apps/extractor/pyproject.toml`. It reached
+the development environment transitively through `grpcio-tools`, a **dev**
+dependency needed only by `scripts/codegen.sh`. The Dockerfile builds with
+`uv sync --frozen --no-dev`, which correctly excluded it — so the module was
+present for every local run, every test, and every CI job, and absent in the
+only environment that mattered.
+
+The identical hazard was already understood in this repo. Four lines above where
+the fix went, `pyproject.toml` says of httpx: *"depending on someone else's
+dependency graph is how a working build breaks on an unrelated upgrade."* The
+rule was written down and not applied to the generated stubs.
+
+A second, independent bug was found while chasing this one:
+`scripts/smoke_grpc.py` could never have run at all — it lacked the `sys.path`
+shim its two sibling scripts carry, so it died on its import line. It was
+written into `CLAUDE.md` as a documented command without being executed once.
+That is the sequencing lesson from the 2026-08-20 entry recurring: verification
+claimed rather than performed.
+
+**Fix:** `protobuf>=7.35.1` declared as a runtime dependency — the floor comes
+from the `ValidateProtobufRuntimeVersion` call the generated stub makes, so it
+is not a guess. `sys.path` shim added to the smoke script.
+
+**Prevention:** A CI step that installs the container's dependency set and
+imports the production entrypoint:
+
+```yaml
+- name: Runtime dependencies are sufficient without dev
+  env:
+    UV_PROJECT_ENVIRONMENT: .venv-runtime
+  run: |
+    uv sync --frozen --no-dev
+    uv run --no-dev --frozen python -c "import app.server"
+```
+
+Tested against a planted regression in both directions: with `protobuf` removed
+from `pyproject.toml` it fails, with it declared it passes. Twenty seconds, and
+it closes the whole class — any runtime import that only a dev dependency
+supplies now fails on a pull request instead of in a crash loop.
+
+**Open:** Nothing catches this for `apps/web`. Vercel installs dev dependencies
+during its build, so a Next.js runtime import satisfied only by a devDependency
+would behave the same way. Worth the equivalent check in Phase 8's hardening.
