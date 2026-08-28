@@ -64,6 +64,16 @@ locals {
     var.site_url != "" ? "NEXT_PUBLIC_SITE_URL" : "",
     var.posthog_key != "" ? "NEXT_PUBLIC_POSTHOG_KEY" : "",
   ]))
+
+  // Not everything here is a secret, and marking the public ones sensitive
+  // would be theatre: NEXT_PUBLIC_* is compiled into the browser bundle by
+  // definition, and the extractor's address is a public Cloud Run URL.
+  web_env_public = toset([
+    "EXTRACTOR_GRPC_ADDRESS",
+    "AUTH_TRUST_HOST",
+    "NEXT_PUBLIC_SITE_URL",
+    "NEXT_PUBLIC_POSTHOG_KEY",
+  ])
 }
 
 resource "vercel_project_environment_variable" "web" {
@@ -72,6 +82,16 @@ resource "vercel_project_environment_variable" "web" {
   project_id = vercel_project.web.id
   key        = each.key
   value      = local.web_env[each.key]
-  target     = ["production", "preview", "development"]
-  sensitive  = true
+
+  // Production and preview only, deliberately not development.
+  //
+  // Vercel's development environment is the one `vercel env pull` writes to a
+  // local file, so the provider refuses to mark anything targeting it
+  // sensitive. That refusal is correct and the fix is not to unmark them: local
+  // development reads the repo's own .env (see .env.example), and pushing the
+  // production database URL into a file on every contributor's laptop is not
+  // something to work around.
+  target = ["production", "preview"]
+
+  sensitive = !contains(local.web_env_public, each.key)
 }

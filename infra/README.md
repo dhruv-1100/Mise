@@ -227,6 +227,12 @@ skipped when empty rather than written blank:
 A blank `AUTH_SECRET` is worse than an absent one: Auth.js would start and sign
 tokens with it. Absent, it refuses to start.
 
+These target **production and preview only, never development**. Vercel's
+development environment is the one `vercel env pull` writes to a local file, so
+the provider refuses to mark anything targeting it sensitive — and the fix is
+not to unmark them. Local development reads the repo's own `.env`; see
+`.env.example`.
+
 ## What is deliberately not here
 
 - **DNS / custom domains.** No domain registered yet.
