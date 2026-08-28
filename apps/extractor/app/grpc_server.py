@@ -157,10 +157,31 @@ class ExtractorService(pb_grpc.ExtractorServicer):
         return json.dumps(recipe) if recipe is not None else ""
 
 
-async def serve(queue: ExtractionQueue, port: int = 50051) -> grpc.aio.Server:
+#: Cloud Run documents that the container must listen on 0.0.0.0.
+#:
+#: This was "[::]". grpcio resolves that to a dual-stack listener and it very
+#: probably worked, but "probably" is not worth spending a deploy cycle on, and
+#: the documented requirement is free to follow.
+DEFAULT_BIND_HOST = "0.0.0.0"
+
+
+async def serve(
+    queue: ExtractionQueue,
+    port: int = 50051,
+    host: str = DEFAULT_BIND_HOST,
+) -> grpc.aio.Server:
     server = grpc.aio.server()
     pb_grpc.add_ExtractorServicer_to_server(ExtractorService(queue), server)
-    server.add_insecure_port(f"[::]:{port}")
+
+    # grpcio raises RuntimeError("Failed to bind to address ...") here on a
+    # failed bind — checked, not assumed, because its documented contract is a
+    # 0 return value and the two behaviours call for very different code. The
+    # test pins it, so a version that changes back to returning 0 fails loudly
+    # rather than producing a server that listens on nothing.
+    bound = server.add_insecure_port(f"{host}:{port}")
+
     await server.start()
-    logger.info("gRPC listening on :%d", port)
+    # `bound`, not `port`: with port=0 the OS chooses, and the requested value
+    # would be a lie in the logs.
+    logger.info("gRPC listening on %s:%d", host, bound)
     return server
