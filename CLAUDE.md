@@ -152,7 +152,7 @@ terraform -chdir=infra plan                # needs TF_VAR_* creds; see infra/REA
 Deployment. The extractor image is built and rolled by
 `.github/workflows/deploy.yml` when CI passes on `main`; the web app is built by
 Vercel's git integration. Neither needs a key — CI federates into Google with
-OIDC. Setup and the five repository variables are in `infra/README.md`.
+OIDC. Setup and the six repository variables are in `infra/README.md`.
 
 ```bash
 # What the deploy workflow does last, runnable by hand against any address.

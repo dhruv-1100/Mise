@@ -188,7 +188,7 @@ revision after CI passes on `main`. It authenticates with Workload Identity
 Federation, so **there is no service account key to create or store** — see
 `infra/github.tf` and `docs/adr/0005-cloud-run-topology.md`.
 
-After `terraform apply`, set five **repository variables** (Settings → Secrets
+After `terraform apply`, set six **repository variables** (Settings → Secrets
 and variables → Actions → Variables). None is a secret; that is the point.
 
 ```bash
@@ -226,6 +226,12 @@ skipped when empty rather than written blank:
 
 A blank `AUTH_SECRET` is worse than an absent one: Auth.js would start and sign
 tokens with it. Absent, it refuses to start.
+
+These target **production and preview only, never development**. Vercel's
+development environment is the one `vercel env pull` writes to a local file, so
+the provider refuses to mark anything targeting it sensitive — and the fix is
+not to unmark them. Local development reads the repo's own `.env`; see
+`.env.example`.
 
 ## What is deliberately not here
 
