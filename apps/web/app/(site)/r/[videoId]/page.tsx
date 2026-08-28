@@ -3,12 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { auth, isAuthConfigured } from "@/auth";
+import { NoRecipe } from "@/components/NoRecipe";
 import { NoteEditor } from "@/components/NoteEditor";
 import { SaveButton } from "@/components/SaveButton";
 import { ServingStepper } from "@/components/ServingStepper";
 import { TrackRecipeView } from "@/components/TrackRecipeView";
 import { canEditChannel, countCooks, getNote, isSaved } from "@/lib/accounts";
-import { loadRecipe, toJsonLd } from "@/lib/recipe";
+import { loadExtraction, toJsonLd } from "@/lib/recipe";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mise.example";
 
@@ -18,8 +19,19 @@ export async function generateMetadata({
   params: Promise<{ videoId: string }>;
 }): Promise<Metadata> {
   const { videoId } = await params;
-  const recipe = await loadRecipe(videoId);
-  if (recipe === null) return { title: "Recipe not found" };
+  const extraction = await loadExtraction(videoId);
+
+  // noindex on a page with no recipe. It is a real page with a real
+  // explanation, but §6.1 makes recipe rich results the acquisition channel,
+  // and letting Google index pages that say "there is no recipe here" trains it
+  // that this site's /r/ URLs are thin. Indexed emptiness costs more than the
+  // traffic it brings.
+  if (extraction.status === "insufficient") {
+    return { title: "No recipe in this video", robots: { index: false, follow: true } };
+  }
+  if (extraction.status === "missing") return { title: "Recipe not found" };
+
+  const recipe = extraction.recipe;
 
   return {
     title: recipe.title,
@@ -102,8 +114,18 @@ export default async function RecipePage({
   params: Promise<{ videoId: string }>;
 }) {
   const { videoId } = await params;
-  const recipe = await loadRecipe(videoId);
-  if (recipe === null) notFound();
+  const extraction = await loadExtraction(videoId);
+
+  // Three outcomes, not two. A video whose description carries no recipe is a
+  // normal result that the extractor explains, and turning that explanation
+  // into the same 404 as a video nobody has ever submitted is what made a
+  // successful-looking extraction end in a blank error page.
+  if (extraction.status === "insufficient") {
+    return <NoRecipe videoId={extraction.videoId} reason={extraction.reason} />;
+  }
+  if (extraction.status === "missing") notFound();
+
+  const recipe = extraction.recipe;
 
   const jsonLd = toJsonLd(recipe, `${SITE}/r/${videoId}`);
 

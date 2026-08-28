@@ -199,16 +199,27 @@ export const InsufficientReason = z.enum([
 ]);
 export type InsufficientReason = z.infer<typeof InsufficientReason>;
 
+/**
+ * The record of a video that produced no recipe.
+ *
+ * Named and exported rather than left inline in the union below, because the
+ * BFF has to match it on its own: the extractor caches a successful extraction
+ * as a bare Recipe with no `{status: "ok"}` envelope, so the reader tells the
+ * two apart by which one parses rather than by a discriminant.
+ */
+export const Insufficient = z
+  .object({
+    status: z.literal("insufficient_source_material"),
+    videoId: VideoId,
+    reason: InsufficientReason,
+    /** What was actually checked, so the message can be specific. */
+    sourcesTried: z.array(SourceKind).min(1),
+  })
+  .strict();
+export type Insufficient = z.infer<typeof Insufficient>;
+
 export const ExtractionResult = z.discriminatedUnion("status", [
   z.object({ status: z.literal("ok"), recipe: Recipe }).strict(),
-  z
-    .object({
-      status: z.literal("insufficient_source_material"),
-      videoId: VideoId,
-      reason: InsufficientReason,
-      /** What was actually checked, so the message can be specific. */
-      sourcesTried: z.array(SourceKind).min(1),
-    })
-    .strict(),
+  Insufficient,
 ]);
 export type ExtractionResult = z.infer<typeof ExtractionResult>;

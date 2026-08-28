@@ -16,6 +16,7 @@ export {
   Creator,
   ExtractionResult,
   Ingredient,
+  Insufficient,
   InsufficientReason,
   Recipe,
   SourceKind,
