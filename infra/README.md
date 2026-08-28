@@ -188,7 +188,7 @@ revision after CI passes on `main`. It authenticates with Workload Identity
 Federation, so **there is no service account key to create or store** — see
 `infra/github.tf` and `docs/adr/0005-cloud-run-topology.md`.
 
-After `terraform apply`, set five **repository variables** (Settings → Secrets
+After `terraform apply`, set six **repository variables** (Settings → Secrets
 and variables → Actions → Variables). None is a secret; that is the point.
 
 ```bash
