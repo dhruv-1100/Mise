@@ -89,6 +89,42 @@ class TestConfig:
             asyncio.run(server.main())
 
 
+class TestBind:
+    def test_a_failed_bind_raises_instead_of_serving_nothing(self):
+        """A failed bind must not produce a running server.
+
+        Whichever it does, a bind failure must reach the caller. A server that
+        started, logged that it was listening and accepted no connections would
+        be visible only as a revision that never went healthy, with nothing in
+        its own logs to say why.
+        """
+        from app.grpc_server import serve
+        from app.queue import ExtractionQueue
+
+        # grpcio's documented contract is a 0 return value; what it actually
+        # does is raise. Either is fine — serving nothing is not — so this
+        # pins the behaviour rather than the mechanism.
+
+        # Hold the port so the server cannot have it.
+        with socket.socket() as held:
+            held.bind(("127.0.0.1", 0))
+            held.listen(1)
+            taken = int(held.getsockname()[1])
+
+            async def scenario():
+                await serve(ExtractionQueue(redis=FakeRedis()), port=taken, host="127.0.0.1")
+
+            with pytest.raises(RuntimeError, match=r"[Ff]ailed to bind"):
+                asyncio.run(scenario())
+
+    def test_it_binds_all_interfaces_by_default(self):
+        # Cloud Run requires 0.0.0.0. "[::]" is not guaranteed inside its
+        # sandbox, and getting this wrong costs a deploy cycle to discover.
+        from app.grpc_server import DEFAULT_BIND_HOST
+
+        assert DEFAULT_BIND_HOST == "0.0.0.0"
+
+
 class TestBoot:
     def test_it_serves_grpc_and_shuts_down_on_sigterm(self, monkeypatch):
         port = free_port()

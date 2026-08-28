@@ -20,8 +20,16 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from pathlib import Path
 
 import grpc
+
+# `python scripts/foo.py` puts scripts/ on sys.path, not the project root, and
+# this project is not installed as a package — there is no [build-system] in
+# pyproject.toml. Without this line the import below raises ModuleNotFoundError
+# before any argument is parsed. scripts/eval.py and scripts/build_eval_set.py
+# carry the same line for the same reason.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.gen import extractor_pb2 as pb
 from app.gen import extractor_pb2_grpc as pb_grpc
