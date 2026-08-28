@@ -28,6 +28,9 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+# CI installs the container's runtime-only dependency set here to prove the
+# production entrypoint imports without dev packages. See ci.yml.
+.venv-runtime/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
