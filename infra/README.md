@@ -227,6 +227,56 @@ skipped when empty rather than written blank:
 A blank `AUTH_SECRET` is worse than an absent one: Auth.js would start and sign
 tokens with it. Absent, it refuses to start.
 
+### Turning accounts on
+
+The app is deployed at https://mise-prod.vercel.app and everything except
+accounts works there. `/api/auth/providers` currently returns Auth.js's
+server-configuration error, which is what a missing secret and a missing
+provider look like from outside.
+
+Only one of the four values needs creating; the rest are a command and a URL.
+
+**1. A Google OAuth client.** GCP console -> APIs & Services -> Credentials ->
+Create credentials -> OAuth client ID -> Web application. The redirect URI is
+the part people get wrong, and Google matches it exactly:
+
+```
+https://mise-prod.vercel.app/api/auth/callback/google
+```
+
+Add `http://localhost:3000/api/auth/callback/google` as a second one if you want
+sign-in to work in `next dev` too. `/api/auth/callback/google` is Auth.js's own
+route, not something this repo chose, so it cannot be renamed.
+
+The base sign-in asks only for `openid email profile` — no consent screen review
+needed. The `youtube.readonly` scope for claiming a channel is requested
+separately and only when someone claims (ADR 0003), and *that* is the one that
+needs Google verification past 100 users.
+
+**2. A signing secret.**
+
+```bash
+openssl rand -base64 32
+```
+
+**3. Apply.** These are variables like any other, so pass them however you pass
+`TF_VAR_neon_api_key` — environment or `terraform.tfvars`:
+
+```bash
+export TF_VAR_auth_secret='...'
+export TF_VAR_google_oauth_client_id='....apps.googleusercontent.com'
+export TF_VAR_google_oauth_client_secret='...'
+export TF_VAR_site_url='https://mise-prod.vercel.app'
+terraform -chdir=infra apply
+```
+
+Terraform writes all four to Vercel, and **Vercel needs a redeploy to pick up
+new environment variables** — an empty commit to main, or Redeploy in the
+dashboard. Env vars are not applied to an existing build.
+
+**4. Check it.** `curl https://mise-prod.vercel.app/api/auth/providers` should
+list Google instead of returning the configuration error.
+
 These target **production and preview only, never development**. Vercel's
 development environment is the one `vercel env pull` writes to a local file, so
 the provider refuses to mark anything targeting it sensitive — and the fix is

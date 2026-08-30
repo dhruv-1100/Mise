@@ -20,8 +20,14 @@ builds the image and rolls a Cloud Run revision after CI passes on main,
 authenticating with Workload Identity Federation so no key is stored anywhere.
 Verified end to end against the live service on 2026-08-28: a real video
 enqueued, drained by the worker and cached, in 91.5s. See
-`docs/adr/0005-cloud-run-topology.md`. The web app is still not deployed — that
-needs the four auth values in `terraform.tfvars` and another apply. The headline finding so far is
+`docs/adr/0005-cloud-run-topology.md`. **The web app is live too**, at
+https://mise-prod.vercel.app — Vercel builds it from the GitHub integration on
+every push to main. Accounts are the one thing that does not work there:
+`/api/auth/providers` returns Auth.js's server-configuration error because
+`AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` and `NEXT_PUBLIC_SITE_URL`
+are not set on the project. The tables exist in Neon and hold zero rows — not
+one sign-in has ever happened, so every account path is code-complete and
+entirely unexercised. Four values and an apply away; see `infra/README.md`. The headline finding so far is
 `docs/adr/0001-content-sourcing.md` — captions are unreachable without creator
 OAuth, so descriptions are the primary source. See `BUILD_PLAN.md` for all 12
 phases.
