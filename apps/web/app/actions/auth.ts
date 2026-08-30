@@ -24,10 +24,14 @@ export async function signInWithGoogle(redirectTo: string): Promise<void> {
  * a channel, which is the difference between an OAuth flow people complete and
  * one they abandon.
  *
- * `prompt: "consent"` is required rather than decorative: Google skips the
- * consent screen entirely for an account that has already authorised this app,
- * and would hand back a token carrying only the original scopes. The claim
- * would then fail with a 403 that looks like a bug.
+ * `prompt: "select_account consent"` does two jobs, and both are required.
+ * `consent` because Google skips the consent screen entirely for an account
+ * that has already authorised this app, and would hand back a token carrying
+ * only the original scopes — the claim would then fail with a 403 that looks
+ * like a bug. `select_account` because the account that owns the channel is
+ * very often not the one already signed in, and this is the flow where that is
+ * most likely: a creator proving ownership is precisely someone with a personal
+ * account and a channel account.
  *
  * `include_granted_scopes` keeps the earlier grants alive alongside the new
  * one, so consenting here does not revoke the sign-in scopes.
@@ -38,7 +42,7 @@ export async function signInToClaimChannel(): Promise<void> {
     { redirectTo: "/creator" },
     {
       scope: `openid email profile ${YOUTUBE_READONLY_SCOPE}`,
-      prompt: "consent",
+      prompt: "select_account consent",
       include_granted_scopes: "true",
       access_type: "online",
     },

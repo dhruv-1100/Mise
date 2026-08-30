@@ -62,7 +62,16 @@ const config: NextAuthConfig = {
           // they ask — see `signInToClaimChannel` in lib/claim.ts. Asking every
           // visitor for read access to their YouTube account at signup would be
           // both a worse consent screen and a worse thing to do.
-          authorization: { params: { scope: "openid email profile" } },
+          //
+          // `prompt: "select_account"` is not cosmetic. Without it Google
+          // silently reuses whichever account the browser is already signed
+          // into and never offers the chooser, so anyone with a personal and a
+          // channel account — the exact people this app wants — gets signed in
+          // as the wrong one with no way to change it short of signing out of
+          // Google entirely.
+          authorization: {
+            params: { scope: "openid email profile", prompt: "select_account" },
+          },
           allowDangerousEmailAccountLinking: false,
         }),
       ]
