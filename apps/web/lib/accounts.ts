@@ -193,6 +193,34 @@ export async function countCooks(userId: string, videoId: string): Promise<numbe
   return row === null ? 0 : Number(row.n);
 }
 
+/**
+ * Count and most recent cook, in one round trip.
+ *
+ * `cook_logs` is append-only precisely so this question can be asked — a
+ * counter column would give the count and lose the date. Both come back
+ * together because the recipe page wants both and a second query for one
+ * timestamp is a second network hop on the render path.
+ *
+ * `max()` over zero rows is NULL rather than an error, so a recipe never
+ * cooked returns `{ count: 0, lastCookedAt: null }` without a special case.
+ */
+export async function cookHistory(
+  userId: string,
+  videoId: string,
+): Promise<{ count: number; lastCookedAt: Date | null }> {
+  const row = await queryOne<{ n: string | number; last: string | Date | null }>(
+    `SELECT count(*) AS n, max(cooked_at) AS last
+       FROM cook_logs
+      WHERE user_id = $1 AND video_id = $2`,
+    [userId, videoId],
+  );
+  if (row === null) return { count: 0, lastCookedAt: null };
+  return {
+    count: Number(row.n),
+    lastCookedAt: row.last === null ? null : new Date(row.last),
+  };
+}
+
 export async function getNote(userId: string, videoId: string): Promise<string | null> {
   const row = await queryOne<{ body: string }>(
     "SELECT body FROM notes WHERE user_id = $1 AND video_id = $2",

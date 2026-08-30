@@ -1,8 +1,21 @@
 import "server-only";
 
-import { Recipe } from "@mise/schema";
+import { Insufficient, type InsufficientReason, Recipe } from "@mise/schema";
 import { getRecipe } from "@/lib/extractor";
 import { getOverride } from "@/lib/overrides";
+
+/**
+ * Why a recipe page has nothing to render.
+ *
+ * "There is no recipe" and "we know exactly why there is no recipe" are
+ * different answers, and collapsing them into `null` is what turned a video
+ * whose description is link-only into a bare 404 — after the progress screen
+ * had already told the person their extraction succeeded.
+ */
+export type Extraction =
+  | { status: "ok"; recipe: Recipe }
+  | { status: "insufficient"; videoId: string; reason: InsufficientReason }
+  | { status: "missing" };
 
 /**
  * Fetch a recipe by video id.
@@ -18,19 +31,49 @@ import { getOverride } from "@/lib/overrides";
  * question to get wrong. `getOverride` returns null when the database is not
  * configured, so this path is unchanged on a deployment with no accounts.
  */
-export async function loadRecipe(videoId: string): Promise<Recipe | null> {
+export async function loadExtraction(videoId: string): Promise<Extraction> {
   const override = await getOverride(videoId).catch(() => null);
-  if (override !== null) return override;
+  if (override !== null) return { status: "ok", recipe: override };
 
   const result = await getRecipe(videoId).catch(() => null);
-  if (result === null || !result.found) return null;
+  if (result === null || !result.found) return { status: "missing" };
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(result.recipeJson);
+  } catch {
+    return { status: "missing" };
+  }
 
   // Parsed through the shared contract rather than trusted. It crossed a
   // process boundary as JSON, and zod is what makes it a Recipe again here.
-  // An extraction that produced insufficient_source_material lands here too
-  // and fails this parse, which is the correct outcome: there is no recipe.
-  const parsed = Recipe.safeParse(JSON.parse(result.recipeJson));
-  return parsed.success ? parsed.data : null;
+  const recipe = Recipe.safeParse(raw);
+  if (recipe.success) return { status: "ok", recipe: recipe.data };
+
+  // Not a recipe, but not nothing either: the extractor recorded why. ADR 0001
+  // measured roughly one description in five carrying no usable recipe, so this
+  // is a normal outcome the UI has to be able to say out loud.
+  const insufficient = Insufficient.safeParse(raw);
+  if (insufficient.success) {
+    return {
+      status: "insufficient",
+      videoId: insufficient.data.videoId,
+      reason: insufficient.data.reason,
+    };
+  }
+
+  return { status: "missing" };
+}
+
+/**
+ * For callers that only care whether there is a recipe to show.
+ *
+ * Cook mode, the editor and the saved list all either have a recipe or have
+ * nothing to do; only the recipe page needs to explain itself.
+ */
+export async function loadRecipe(videoId: string): Promise<Recipe | null> {
+  const extraction = await loadExtraction(videoId);
+  return extraction.status === "ok" ? extraction.recipe : null;
 }
 
 /**

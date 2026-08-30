@@ -99,6 +99,45 @@ jobs:
           uv sync --frozen --no-dev
           uv run --no-dev --frozen python -c "import app.server"
 
+  e2e:
+    name: cook mode (Playwright)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: pnpm/action-setup@v6.0.10
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      # Chromium only. The suite covers behaviour, not rendering engines, and
+      # three browsers would triple the download for no finding.
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # The extractor is stubbed in-process (e2e/stub-extractor.ts), so this
+      # needs no network, no API keys and no database — the specs cover the
+      # signed-out public surface, and the app degrading cleanly to "signed out"
+      # when accounts are unconfigured is itself part of what they exercise.
+      - name: Test
+        run: pnpm e2e
+
+      - uses: actions/upload-artifact@v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7
+
   codegen:
     name: proto stubs are current
     runs-on: ubuntu-latest

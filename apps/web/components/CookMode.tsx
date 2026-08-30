@@ -7,6 +7,8 @@ import type { Recipe } from "@mise/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { track } from "@/lib/analytics/client";
+import { describeDuration, formatCountdown, formatDuration } from "@/lib/timer";
+import { useTimers } from "@/components/useTimers";
 
 /**
  * Cook mode.
@@ -23,6 +25,7 @@ export function CookMode({ recipe, signedIn }: { recipe: Recipe; signedIn: boole
   const total = recipe.steps.length;
 
   const wakeLock = useWakeLock();
+  const timers = useTimers();
 
   const openedAt = useRef(Date.now());
   const deepest = useRef(0);
@@ -126,9 +129,12 @@ export function CookMode({ recipe, signedIn }: { recipe: Recipe; signedIn: boole
         {(step.durationS !== null || step.tempC !== null) && (
           <div className="mt-6 flex flex-wrap gap-3">
             {step.durationS !== null && (
-              <span className="rounded-lg bg-cook-surface px-5 py-4 text-xl font-semibold tabular-nums">
-                {formatDuration(step.durationS)}
-              </span>
+              <StepTimer
+                durationS={step.durationS}
+                remaining={timers.remaining(index)}
+                onStart={() => timers.start(index, step.durationS!)}
+                onCancel={() => timers.cancel(index)}
+              />
             )}
             {step.tempC !== null && (
               <span className="rounded-lg bg-cook-surface px-5 py-4 text-xl font-semibold tabular-nums">
@@ -137,7 +143,19 @@ export function CookMode({ recipe, signedIn }: { recipe: Recipe; signedIn: boole
             )}
           </div>
         )}
+
+        {/* Timers belonging to OTHER steps. Without this, starting a 20-minute
+            simmer and moving on hides the only thing you need to see. */}
+        <OtherTimers timers={timers} currentStep={index} />
       </div>
+
+      {timers.justRang !== null && (
+        <TimerFinished
+          durationS={timers.justRang.durationS}
+          stepNumber={timers.justRang.stepIndex + 1}
+          onDismiss={timers.dismiss}
+        />
+      )}
 
       <div className="flex gap-3 px-5 pb-9 pt-5">
         <button
@@ -160,12 +178,6 @@ export function CookMode({ recipe, signedIn }: { recipe: Recipe; signedIn: boole
       </div>
     </main>
   );
-}
-
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m === 0 ? `${s}s` : s === 0 ? `${m} min` : `${m}:${String(s).padStart(2, "0")}`;
 }
 
 type WakeLockState = "idle" | "held" | "unsupported";
@@ -216,4 +228,148 @@ function useWakeLock(): WakeLockState {
   }, []);
 
   return state;
+}
+
+
+/**
+ * The duration on a step, as a control rather than a label.
+ *
+ * BUILD_PLAN.md §6.1 asked for inline timers and the step already carries
+ * `durationS`; until now it was printed as text. Tapping it is the difference
+ * between a recipe viewer and something you cook from.
+ */
+function StepTimer({
+  durationS,
+  remaining,
+  onStart,
+  onCancel,
+}: {
+  durationS: number;
+  remaining: number | null;
+  onStart: () => void;
+  onCancel: () => void;
+}) {
+  if (remaining === null) {
+    return (
+      <button
+        type="button"
+        onClick={onStart}
+        className="flex min-h-[60px] items-center gap-2.5 rounded-lg bg-cook-surface px-5 py-4 text-xl font-semibold tabular-nums"
+      >
+        <span aria-hidden="true">⏱</span>
+        {formatDuration(durationS)}
+        <span className="text-[13px] font-semibold uppercase tracking-[0.08em] text-cook-ink-soft">
+          start
+        </span>
+      </button>
+    );
+  }
+
+  const done = remaining === 0;
+  return (
+    <button
+      type="button"
+      onClick={onCancel}
+      aria-label={done ? "Timer finished, dismiss" : `${formatCountdown(remaining)} remaining, cancel timer`}
+      className={`flex min-h-[60px] items-center gap-3 rounded-lg px-5 py-4 text-xl font-bold tabular-nums ${
+        done ? "bg-accent text-ground" : "bg-cook-surface text-cook-ink"
+      }`}
+    >
+      {/* aria-hidden because the button's own label already says it: without
+          this a screen reader announces the countdown twice, once per second. */}
+      <span aria-hidden="true">{done ? "Time's up" : formatCountdown(remaining)}</span>
+      <span className="text-[13px] font-semibold uppercase tracking-[0.08em] opacity-70">
+        {done ? "dismiss" : "cancel"}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Timers started on steps you are no longer looking at.
+ *
+ * The reason timers live above the step: you start a twenty-minute simmer and
+ * move on to the next thing, which is exactly when you most need to see it.
+ */
+function OtherTimers({
+  timers,
+  currentStep,
+}: {
+  timers: ReturnType<typeof useTimers>;
+  currentStep: number;
+}) {
+  const others = Object.values(timers.timers).filter((t) => t.stepIndex !== currentStep);
+  if (others.length === 0) return null;
+
+  return (
+    <ul className="mt-6 flex flex-col gap-2">
+      {others.map((t) => {
+        const left = timers.remaining(t.stepIndex) ?? 0;
+        return (
+          <li
+            key={t.stepIndex}
+            className="flex items-center justify-between gap-3 rounded-lg bg-cook-surface px-4 py-3"
+          >
+            <span className="text-[15px] text-cook-ink-soft">Step {t.stepIndex + 1}</span>
+            <span className="flex items-center gap-3">
+              <span className={`text-lg font-bold tabular-nums ${left === 0 ? "text-accent" : ""}`}>
+                {left === 0 ? "Time's up" : formatCountdown(left)}
+              </span>
+              <button
+                type="button"
+                onClick={() => timers.cancel(t.stepIndex)}
+                aria-label={`Cancel the timer on step ${t.stepIndex + 1}`}
+                className="flex size-11 items-center justify-center rounded-md text-cook-ink-soft"
+              >
+                ✕
+              </button>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * The visual half of the alarm.
+ *
+ * The one alert that always works. Vibration needs a motor and audio needs a
+ * prior gesture and an unmuted device; neither is guaranteed in a kitchen, so
+ * nothing depends on them.
+ *
+ * role="alertdialog" rather than a toast: a finished timer is the one thing in
+ * this app worth interrupting for, and it should survive the person not having
+ * looked at the screen for twenty minutes.
+ */
+function TimerFinished({
+  durationS,
+  stepNumber,
+  onDismiss,
+}: {
+  durationS: number;
+  stepNumber: number;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="timer-finished"
+      className="fixed inset-x-0 bottom-0 z-10 border-t border-cook-surface bg-accent px-5 pb-9 pt-6 text-ground"
+    >
+      <p id="timer-finished" className="text-2xl font-bold">
+        {describeDuration(durationS)} up
+      </p>
+      <p className="mt-1 text-base opacity-80">Step {stepNumber}</p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        autoFocus
+        className="mt-5 h-[60px] w-full rounded-md bg-ground text-lg font-bold text-ink"
+      >
+        Stop
+      </button>
+    </div>
+  );
 }

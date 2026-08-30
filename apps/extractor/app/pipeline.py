@@ -17,11 +17,12 @@ actually in these recipes, and building it early means throwing it away.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
-from app.extract import extract_recipe
-from app.llm import LlmProvider
+from app.extract import extract_recipe, extract_recipe_from_video
+from app.llm import LlmError, LlmProvider, LlmResponse
 from app.normalize import normalize_description
 from app.schema import Creator, ExtractionInsufficient, ExtractionOk, JobStage, SourceKind
 from app.units import CanonicalQuantity, canonicalise
@@ -58,6 +59,8 @@ class PipelineOutput:
 
 #: Called as each stage begins. The worker uses it to publish live status;
 #: nothing else does, so it defaults to a no-op rather than being required.
+logger = logging.getLogger(__name__)
+
 StageCallback = Callable[[JobStage], Awaitable[None]]
 
 
@@ -67,6 +70,7 @@ async def run_pipeline(
     provider: LlmProvider,
     video_id: str,
     on_stage: StageCallback | None = None,
+    watch_video: bool = True,
 ) -> PipelineOutput:
     """Fetch, clean, extract, canonicalise.
 
@@ -105,6 +109,46 @@ async def run_pipeline(
         description=normalized.text,
     )
 
+    # The fallback (ADR 0006). ADR 0001 measured roughly one description in five
+    # carrying no recipe at all, and until this existed that was where the
+    # product stopped — the reader got a page explaining there was nothing, for
+    # a video that plainly contains a recipe.
+    #
+    # Strictly second, never first. Watching costs around fifty times the input
+    # tokens of reading a description and tens of seconds of wall clock, so the
+    # cheap path runs for every video and this runs only where the cheap path
+    # came back empty-handed.
+    watched: LlmResponse | None = None
+    if watch_video and isinstance(result, ExtractionInsufficient):
+        await stage(JobStage.WATCHING)
+        try:
+            video_result, watched = await extract_recipe_from_video(
+                provider,
+                video_id=metadata.video_id,
+                title=metadata.title,
+                creator=creator,
+            )
+        except LlmError as exc:
+            # Best-effort, deliberately. At this point the description stage has
+            # already produced a correct, complete answer — "there is no recipe
+            # in the description". Letting a failure of the *optional* second
+            # attempt propagate would discard that answer and fail the whole
+            # extraction, so a quota limit or a saturated model would turn a
+            # working result into a retry loop. The fallback can only ever add.
+            logger.warning(
+                "video fallback failed for %s, keeping description result: %s",
+                metadata.video_id,
+                exc,
+            )
+        else:
+            # Only take the video's answer if it actually found something. A
+            # video extraction that also comes back empty must not overwrite the
+            # description's reason with its own — "not a recipe video" is a worse
+            # and less accurate explanation than "the description is only links",
+            # and the no-recipe page shows that reason verbatim.
+            if isinstance(video_result, ExtractionOk):
+                result = video_result
+
     await stage(JobStage.CANONICALISING)
     canonical: tuple[CanonicalQuantity, ...] = ()
     if isinstance(result, ExtractionOk):
@@ -121,9 +165,12 @@ async def run_pipeline(
             description_lines=normalized.original_line_count,
             lines_removed=len(normalized.removed),
             chapters_found=len(normalized.chapters),
-            input_tokens=response.input_tokens,
-            output_tokens=response.output_tokens,
-            model=response.model,
+            # Both calls, when there were two. Phase 7's cost-per-extraction
+            # metric is the whole reason these are carried, and a fallback that
+            # spent fifty times the tokens must not report only the cheap half.
+            input_tokens=response.input_tokens + (watched.input_tokens if watched else 0),
+            output_tokens=response.output_tokens + (watched.output_tokens if watched else 0),
+            model=watched.model if watched else response.model,
             canonicalised_quantities=sum(1 for c in canonical if c.is_canonical),
         ),
     )

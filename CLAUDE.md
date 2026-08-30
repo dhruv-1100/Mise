@@ -40,7 +40,9 @@ phases.
 - `apps/extractor` — Python 3.12 + FastAPI, managed by uv. Owns all LLM calls
   and parsing. The web app never calls an LLM directly. Pipeline stages are pure
   functions in `app/`: `normalize.py` (strip description noise), `extract.py`
-  (LLM extraction and mapping onto the contract), `units.py` (canonical
+  (LLM extraction and mapping onto the contract — from the description, and from
+  the video itself when the description has no recipe, see ADR 0006),
+  `units.py` (canonical
   grams/ml), `evaluation.py` (scoring against ground truth), `queue.py`
   (Redis-backed jobs: idempotency, retry/DLQ, cache, backpressure),
   `worker.py` (drains the queue), `grpc_server.py` (the BFF-facing surface).
@@ -88,7 +90,9 @@ compiles them via `transpilePackages`, so there is no build-ordering problem.
   ever be written to `scripts/spike_output/`, which is gitignored.
 - **Official YouTube Data API only.** No yt-dlp, no transcript scrapers. If the
   official API cannot do something, that is a finding to document in an ADR, not
-  an obstacle to route around.
+  an obstacle to route around. ADR 0006 is what that looks like done properly:
+  the video fallback hands a URL to Gemini rather than pulling media off
+  YouTube, and it is on the record rather than assumed to be fine.
 - `packages/scaling` stays dependency-free and deterministic — no I/O, no clock,
   no randomness.
 - Every API route returns a typed error envelope, never a raw exception.
@@ -133,6 +137,8 @@ uv run uvicorn app.main:app --reload   # :8000, needs YOUTUBE_API_KEY + GEMINI_A
 
 ```bash
 uv run scripts/spike_captions.py ID1 ID2   # Phase 2.1 spike (self-contained)
+uv run --frozen python scripts/spike_video.py VIDEO_ID   # ADR 0006 spike: can
+                                          # Gemini read a recipe off the video?
 uv run scripts/spike_captions.py --replay-q4  # re-analyse cached text, 0 quota
 
 # Eval set (Phase 2.2). Ground truth lives in apps/extractor/tests/fixtures/eval/;

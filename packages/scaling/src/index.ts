@@ -8,6 +8,8 @@
  * so nothing it depends on reaches the runtime.
  */
 
+export { classifyUnit, isMetric, toMetric } from "./convert";
+export type { Converted, UnitKind } from "./convert";
 export { formatQuantity } from "./format";
 export { scale } from "./scale";
 export { classify, isBakingRecipe, isEgg } from "./taxonomy";

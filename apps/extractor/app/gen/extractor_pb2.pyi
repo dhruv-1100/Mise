@@ -21,6 +21,7 @@ class JobStage(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     JOB_STAGE_NORMALIZING: _ClassVar[JobStage]
     JOB_STAGE_EXTRACTING: _ClassVar[JobStage]
     JOB_STAGE_CANONICALISING: _ClassVar[JobStage]
+    JOB_STAGE_WATCHING: _ClassVar[JobStage]
 JOB_STATE_UNSPECIFIED: JobState
 JOB_STATE_QUEUED: JobState
 JOB_STATE_RUNNING: JobState
@@ -31,6 +32,7 @@ JOB_STAGE_FETCHING: JobStage
 JOB_STAGE_NORMALIZING: JobStage
 JOB_STAGE_EXTRACTING: JobStage
 JOB_STAGE_CANONICALISING: JobStage
+JOB_STAGE_WATCHING: JobStage
 
 class ExtractRequest(_message.Message):
     __slots__ = ("video",)
