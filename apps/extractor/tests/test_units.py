@@ -5,6 +5,9 @@ report itself as unconvertible, never guess. A wrong gram value is worse than
 no gram value, because nothing downstream can tell it is wrong.
 """
 
+import json
+import pathlib
+
 import pytest
 
 from app.units import CanonicalQuantity, UnitKind, canonicalise, classify_unit
@@ -165,3 +168,60 @@ class TestConsistency:
         single = canonicalise(1, "cup")
         triple = canonicalise(3, "cup")
         assert triple.millilitres == pytest.approx(single.millilitres * 3)
+
+
+class TestSharedFixture:
+    """The same table `packages/scaling/tests/convert.test.ts` reads.
+
+    `units.py` canonicalises for the eval harness; `convert.ts` converts for
+    display. Same arithmetic, two hand-written copies, which is exactly the
+    drift this repo already guards against for the recipe contract. A factor
+    changed on one side and not the other fails in both suites.
+    """
+
+    @staticmethod
+    def _fixture() -> dict:
+        path = (
+            pathlib.Path(__file__).resolve().parents[3]
+            / "packages"
+            / "schema"
+            / "fixtures"
+            / "units"
+            / "conversions.json"
+        )
+        return json.loads(path.read_text())
+
+    def test_the_fixture_is_not_empty(self):
+        # A fixture that silently emptied would turn this class into a no-op
+        # that still reports green.
+        fixture = self._fixture()
+        assert len(fixture["mass"]) > 0
+        assert len(fixture["volume"]) > 0
+        assert len(fixture["not_convertible"]) > 0
+
+    def test_every_mass_case_matches(self):
+        for case in self._fixture()["mass"]:
+            result = canonicalise(case["qty"], case["unit"])
+            assert result.kind is UnitKind.MASS, case["unit"]
+            assert result.grams == pytest.approx(case["grams"]), case["unit"]
+
+    def test_every_volume_case_matches(self):
+        for case in self._fixture()["volume"]:
+            result = canonicalise(case["qty"], case["unit"])
+            assert result.kind is UnitKind.VOLUME, case["unit"]
+            assert result.millilitres == pytest.approx(case["millilitres"]), case["unit"]
+
+    def test_nothing_in_not_convertible_gets_a_number(self):
+        # Inventing a gram value for "a pinch" or "2 cloves" is the same failure
+        # as inventing a quantity: a number nobody stated.
+        for case in self._fixture()["not_convertible"]:
+            result = canonicalise(2, case["unit"])
+            assert result.grams is None, case["why"]
+            assert result.millilitres is None, case["why"]
+
+    def test_every_ambiguous_unit_records_its_assumption(self):
+        # A US cup is 236.6ml, a metric cup 250ml, an imperial cup 284ml. The
+        # choice is not neutral and the reader is told.
+        for unit in self._fixture()["ambiguous"]:
+            result = canonicalise(1, unit)
+            assert result.assumptions, unit

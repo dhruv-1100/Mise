@@ -1,0 +1,55 @@
+{
+  "_comment": [
+    "Unit conversion, as one table checked by two implementations.",
+    "",
+    "apps/extractor/app/units.py canonicalises for the eval harness and future",
+    "entity resolution. packages/scaling/src/convert.ts converts for display, so",
+    "a reader can switch a recipe to grams. Same arithmetic, different callers —",
+    "and two hand-written copies of a conversion table is exactly the drift this",
+    "repo already guards against for the recipe contract.",
+    "",
+    "Both suites read this file. A factor changed on one side and not the other",
+    "fails in both.",
+    "",
+    "Volume is US customary. That choice is not neutral and is recorded in",
+    "`ambiguous` below: a cup is 236.6ml in the US, 250ml metric, 284ml imperial."
+  ],
+  "mass": [
+    { "unit": "g", "qty": 1, "grams": 1 },
+    { "unit": "gram", "qty": 250, "grams": 250 },
+    { "unit": "grams", "qty": 250, "grams": 250 },
+    { "unit": "kg", "qty": 1.5, "grams": 1500 },
+    { "unit": "kilogram", "qty": 2, "grams": 2000 },
+    { "unit": "mg", "qty": 500, "grams": 0.5 },
+    { "unit": "oz", "qty": 1, "grams": 28.349523125 },
+    { "unit": "ounce", "qty": 4, "grams": 113.3980925 },
+    { "unit": "lb", "qty": 1, "grams": 453.59237 },
+    { "unit": "pound", "qty": 2, "grams": 907.18474 }
+  ],
+  "volume": [
+    { "unit": "ml", "qty": 100, "millilitres": 100 },
+    { "unit": "millilitre", "qty": 250, "millilitres": 250 },
+    { "unit": "l", "qty": 1.5, "millilitres": 1500 },
+    { "unit": "litre", "qty": 2, "millilitres": 2000 },
+    { "unit": "tsp", "qty": 1, "millilitres": 4.92892159375 },
+    { "unit": "teaspoon", "qty": 3, "millilitres": 14.78676478125 },
+    { "unit": "tbsp", "qty": 1, "millilitres": 14.78676478125 },
+    { "unit": "tablespoon", "qty": 2, "millilitres": 29.5735295625 },
+    { "unit": "cup", "qty": 1, "millilitres": 236.5882365 },
+    { "unit": "cups", "qty": 0.5, "millilitres": 118.29411825 },
+    { "unit": "fl oz", "qty": 1, "millilitres": 29.5735295625 },
+    { "unit": "pint", "qty": 1, "millilitres": 473.176473 },
+    { "unit": "quart", "qty": 1, "millilitres": 946.352946 },
+    { "unit": "gallon", "qty": 1, "millilitres": 3785.411784 }
+  ],
+  "ambiguous": ["cup", "cups", "tbsp", "tbsps", "tablespoon", "tablespoons"],
+  "not_convertible": [
+    { "unit": null, "why": "no unit at all" },
+    { "unit": "clove", "why": "countable, not measured" },
+    { "unit": "no.", "why": "countable" },
+    { "unit": "sprig", "why": "countable" },
+    { "unit": "pinch", "why": "vague by nature" },
+    { "unit": "handful", "why": "vague by nature" },
+    { "unit": "glug", "why": "not a unit anyone can measure" }
+  ]
+}

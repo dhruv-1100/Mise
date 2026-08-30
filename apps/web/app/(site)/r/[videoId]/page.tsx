@@ -8,7 +8,8 @@ import { NoteEditor } from "@/components/NoteEditor";
 import { SaveButton } from "@/components/SaveButton";
 import { ServingStepper } from "@/components/ServingStepper";
 import { TrackRecipeView } from "@/components/TrackRecipeView";
-import { canEditChannel, countCooks, getNote, isSaved } from "@/lib/accounts";
+import { canEditChannel, cookHistory, getNote, isSaved } from "@/lib/accounts";
+import { relativeTime } from "@/lib/relative-time";
 import { loadExtraction, toJsonLd } from "@/lib/recipe";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mise.example";
@@ -78,10 +79,10 @@ async function PersonalActions({ videoId, channelId }: { videoId: string; channe
     );
   }
 
-  const [saved, note, cooked, canEdit] = await Promise.all([
+  const [saved, note, cooks, canEdit] = await Promise.all([
     isSaved(user.id, videoId),
     getNote(user.id, videoId),
-    countCooks(user.id, videoId),
+    cookHistory(user.id, videoId),
     canEditChannel(user.id, channelId),
   ]);
 
@@ -89,9 +90,14 @@ async function PersonalActions({ videoId, channelId }: { videoId: string; channe
     <>
       <div className="mt-6 flex items-center gap-3">
         <SaveButton videoId={videoId} initialSaved={saved} signedIn />
-        {cooked > 0 && (
+        {cooks.count > 0 && (
+          /* `cook_logs` is append-only so this question can be asked at all; a
+             counter column would give the number and lose the date. "Cooked
+             twice, last 3 weeks ago" is the line that makes a saved recipe feel
+             like yours rather than a bookmark. */
           <span className="text-[13px] text-ink-faint">
-            cooked {cooked} {cooked === 1 ? "time" : "times"}
+            cooked {cooks.count} {cooks.count === 1 ? "time" : "times"}
+            {cooks.lastCookedAt !== null && ` · last ${relativeTime(cooks.lastCookedAt)}`}
           </span>
         )}
         {canEdit && (

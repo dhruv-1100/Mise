@@ -1,6 +1,6 @@
 "use client";
 
-import { scale, type ScaledIngredient } from "@mise/scaling";
+import { isMetric, scale, toMetric, type ScaledIngredient } from "@mise/scaling";
 import type { Recipe } from "@mise/schema";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -13,9 +13,40 @@ import { track } from "@/lib/analytics/client";
  * salt grows sublinearly, countable things round to whole units, and a vague
  * quantity is never given a number.
  */
+const METRIC_KEY = "mise:metric";
+
 export function ServingStepper({ recipe }: { recipe: Recipe }) {
   const base = recipe.yield?.qty ?? null;
   const [servings, setServings] = useState(base ?? 4);
+  const [metric, setMetric] = useState(false);
+
+  // Read after mount, never during render: the server has no localStorage, and
+  // seeding state from it directly would make the first client render disagree
+  // with the server's HTML. Wrapped because a private window or a browser set
+  // to block site data throws on access rather than returning null.
+  useEffect(() => {
+    try {
+      setMetric(window.localStorage.getItem(METRIC_KEY) === "1");
+    } catch {
+      // No storage. The toggle still works, it just does not persist.
+    }
+  }, []);
+
+  function chooseMetric(next: boolean) {
+    setMetric(next);
+    try {
+      window.localStorage.setItem(METRIC_KEY, next ? "1" : "0");
+    } catch {
+      // As above.
+    }
+  }
+
+  // Offering the toggle when it would change nothing is worse than not
+  // offering it: the reader taps it and wonders what broke. Only shown when
+  // something here is convertible AND not already metric.
+  const convertible = recipe.ingredients.some(
+    (i) => !isMetric(i.unit) && toMetric(i.qty, i.unit) !== null,
+  );
 
   const result = useMemo(() => scale(recipe, servings), [recipe, servings]);
 
@@ -49,6 +80,7 @@ export function ServingStepper({ recipe }: { recipe: Recipe }) {
     // Scaling needs a yield to scale from. Saying so beats inventing four.
     return (
       <IngredientList
+        metric={false}
         items={recipe.ingredients.map((ingredient) => ({
           ingredient,
           originalQty: ingredient.qty,
@@ -62,7 +94,7 @@ export function ServingStepper({ recipe }: { recipe: Recipe }) {
   }
 
   if (!result.ok) {
-    return <IngredientList items={[]} note="These quantities cannot be scaled." />;
+    return <IngredientList items={[]} metric={false} note="These quantities cannot be scaled." />;
   }
 
   const { value } = result;
@@ -123,12 +155,52 @@ export function ServingStepper({ recipe }: { recipe: Recipe }) {
         </ul>
       )}
 
-      <IngredientList items={value.ingredients} />
+      {convertible && (
+        <div className="mt-6 flex items-center justify-end gap-2">
+          <span className="text-[13px] text-ink-faint">Units</span>
+          <div
+            role="group"
+            aria-label="Unit system"
+            className="flex overflow-hidden rounded-md border border-line"
+          >
+            <button
+              type="button"
+              aria-pressed={!metric}
+              onClick={() => chooseMetric(false)}
+              className={`min-h-11 px-3.5 text-[13px] font-semibold ${
+                metric ? "text-ink-soft" : "bg-accent-wash text-accent-deep"
+              }`}
+            >
+              As written
+            </button>
+            <button
+              type="button"
+              aria-pressed={metric}
+              onClick={() => chooseMetric(true)}
+              className={`min-h-11 border-l border-line px-3.5 text-[13px] font-semibold ${
+                metric ? "bg-accent-wash text-accent-deep" : "text-ink-soft"
+              }`}
+            >
+              Metric
+            </button>
+          </div>
+        </div>
+      )}
+
+      <IngredientList items={value.ingredients} metric={metric} />
     </>
   );
 }
 
-function IngredientList({ items, note }: { items: ScaledIngredient[]; note?: string }) {
+function IngredientList({
+  items,
+  metric,
+  note,
+}: {
+  items: ScaledIngredient[];
+  metric: boolean;
+  note?: string;
+}) {
   return (
     <>
       {note !== undefined && <p className="mt-4 text-[13px] text-ink-soft">{note}</p>}
@@ -138,9 +210,7 @@ function IngredientList({ items, note }: { items: ScaledIngredient[]; note?: str
             key={`${item.ingredient.name}-${i}`}
             className="flex items-baseline gap-3.5 border-b border-line py-2.5"
           >
-            <span className="w-[88px] flex-none text-base font-semibold tabular-nums">
-              {item.display}
-            </span>
+            <Amount item={item} metric={metric} />
             <span className="min-w-0 flex-1">
               <span className="block text-base leading-snug">{item.ingredient.name}</span>
               {item.ingredient.prep !== null && (
@@ -165,5 +235,47 @@ function IngredientList({ items, note }: { items: ScaledIngredient[]; note?: str
         ))}
       </ul>
     </>
+  );
+}
+
+/**
+ * The amount, in whichever system the reader chose.
+ *
+ * Conversion happens here rather than inside `scale()`. The scaling engine is
+ * pure and deterministic by charter and has no business knowing about a
+ * display preference; and the same scaled recipe has to be renderable both
+ * ways without recomputing it.
+ *
+ * Falls back to the written amount whenever there is nothing to convert — a
+ * count ("2 no."), a vague quantity ("to taste"), or a unit the tables do not
+ * know. Silently showing the original is right: the reader asked for metric
+ * where metric exists, not for every line to change.
+ */
+function Amount({ item, metric }: { item: ScaledIngredient; metric: boolean }) {
+  const converted = metric ? toMetric(item.ingredient.qty, item.ingredient.unit) : null;
+
+  if (converted === null) {
+    return (
+      <span className="w-[88px] flex-none text-base font-semibold tabular-nums">
+        {item.display}
+      </span>
+    );
+  }
+
+  return (
+    <span className="w-[88px] flex-none text-base font-semibold tabular-nums">
+      {converted.qty} {converted.unit}
+      {/* A US cup is 236.6ml, a metric cup 250ml, an imperial cup 284ml — up to
+          20% apart. The reader is told rather than handed a confident number
+          that may be a fifth wrong. */}
+      {converted.approximate && (
+        <span
+          className="ml-1 text-[11px] font-semibold text-ink-faint"
+          title={`Converted from ${item.display}. Cup and tablespoon sizes differ by region; this assumes US measures.`}
+        >
+          ≈
+        </span>
+      )}
+    </span>
   );
 }
