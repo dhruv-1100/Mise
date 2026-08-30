@@ -49,6 +49,23 @@ export async function signInToClaimChannel(): Promise<void> {
   );
 }
 
+/**
+ * Sign in as somebody else, without signing out first.
+ *
+ * `prompt: "select_account"` is already the provider's default, and is repeated
+ * here because this action's entire purpose is the chooser — a future change to
+ * the default must not silently turn "switch account" into "confirm you are
+ * still the same person".
+ *
+ * No sign-out beforehand, deliberately: ending the session first would leave
+ * anyone who reaches Google's chooser and changes their mind signed out of an
+ * app they had not meant to leave. Completing the flow replaces the session;
+ * abandoning it leaves the original one intact.
+ */
+export async function switchAccount(redirectTo: string): Promise<void> {
+  await signIn("google", { redirectTo }, { prompt: "select_account" });
+}
+
 export async function signOutEverywhere(): Promise<void> {
   await signOut({ redirectTo: "/" });
 }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import { signOutEverywhere } from "@/app/actions/auth";
 import { auth, isAuthConfigured } from "@/auth";
+import { AccountMenu } from "@/components/AccountMenu";
 
 /**
  * The one piece of chrome shared by every page except cook mode.
@@ -53,14 +53,13 @@ export async function SiteHeader() {
             >
               {user.role === "creator" || user.role === "admin" ? "Your channel" : "For creators"}
             </Link>
-            <form action={signOutEverywhere}>
-              <button
-                type="submit"
-                className="flex h-11 items-center rounded-md px-3 text-[15px] text-ink-soft"
-              >
-                Sign out
-              </button>
-            </form>
+            <AccountMenu
+              name={user.name}
+              email={user.email}
+              image={user.image}
+              role={user.role}
+              returnTo="/me"
+            />
           </nav>
         )}
       </div>
