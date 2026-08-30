@@ -1,0 +1,70 @@
+{
+  "videoId": "641twGz83nM",
+  "title": "Recipe read off the video itself",
+  "creator": {
+    "name": "Example Kitchen",
+    "channelId": "UCexampleexampleexample",
+    "channelUrl": "https://www.youtube.com/channel/UCexampleexampleexample"
+  },
+  "ingredients": [
+    {
+      "name": "cream cheese",
+      "qty": 200,
+      "qtyText": null,
+      "unit": "g",
+      "prep": null,
+      "optional": false,
+      "source": "video",
+      "confidence": 0.9
+    },
+    {
+      "name": "vanilla essence",
+      "qty": null,
+      "qtyText": "a few drops",
+      "unit": null,
+      "prep": null,
+      "optional": false,
+      "source": "video",
+      "confidence": 0.8
+    },
+    {
+      "name": "sugar",
+      "qty": 0.5,
+      "qtyText": null,
+      "unit": "cup",
+      "prep": null,
+      "optional": false,
+      "source": "description",
+      "confidence": 1
+    }
+  ],
+  "steps": [
+    {
+      "index": 1,
+      "text": "Crush the biscuits in a bag with a rolling pin.",
+      "durationS": null,
+      "tempC": null,
+      "source": "video"
+    },
+    {
+      "index": 2,
+      "text": "Heat sugar and water without stirring until it caramelises.",
+      "durationS": 300,
+      "tempC": null,
+      "source": "video"
+    }
+  ],
+  "yield": { "qty": 6, "qtyText": null, "unit": "serving" },
+  "equipment": ["springform tin", "rolling pin"],
+  "sources": ["video", "description"],
+  "conflicts": [
+    {
+      "field": "ingredients.2.qty",
+      "description": "1/2 cup sugar",
+      "caption": null,
+      "chosen": "description",
+      "reason": "written quantities beat spoken ones; the video only said \"some sugar\""
+    }
+  ],
+  "extractedAt": "2026-08-28T04:30:00Z"
+}

@@ -11,6 +11,10 @@ const STAGES = [
   { key: "JOB_STAGE_FETCHING", label: "Fetching the description" },
   { key: "JOB_STAGE_NORMALIZING", label: "Stripping links and sponsor reads" },
   { key: "JOB_STAGE_EXTRACTING", label: "Reading the recipe" },
+  // Only reached when the description carried no recipe (ADR 0006), and it
+  // takes tens of seconds rather than the few the others take. Said out loud
+  // because a progress screen that sits silently that long reads as stuck.
+  { key: "JOB_STAGE_WATCHING", label: "No recipe written down — watching the video" },
   { key: "JOB_STAGE_CANONICALISING", label: "Converting to grams and millilitres" },
 ] as const;
 
@@ -34,8 +38,12 @@ function name(v: string | number, enumName: "state" | "stage"): string {
   if (typeof v === "string") return v;
   const states = ["JOB_STATE_UNSPECIFIED", "JOB_STATE_QUEUED", "JOB_STATE_RUNNING",
     "JOB_STATE_SUCCEEDED", "JOB_STATE_FAILED"];
+  // Index order must match the proto's field numbers, not the display order
+  // above: WATCHING is 5 and CANONICALISING is 4, because the stage was added
+  // to the enum after it. Reordering this array to read nicely would silently
+  // mislabel every stage past the third.
   const stages = ["JOB_STAGE_UNSPECIFIED", "JOB_STAGE_FETCHING", "JOB_STAGE_NORMALIZING",
-    "JOB_STAGE_EXTRACTING", "JOB_STAGE_CANONICALISING"];
+    "JOB_STAGE_EXTRACTING", "JOB_STAGE_CANONICALISING", "JOB_STAGE_WATCHING"];
   return (enumName === "state" ? states : stages)[v] ?? "";
 }
 

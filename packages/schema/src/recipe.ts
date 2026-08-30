@@ -27,8 +27,13 @@ export const VideoId = z
  * later, for a minority of videos. When both exist they will disagree, and the
  * resolution rule (description wins for quantities, caption wins for technique)
  * is impossible to apply without knowing which is which.
+ *
+ * `video` is the model watching the video itself — see ADR 0006. It reads on
+ * the same rule as `caption` and for the same reason: it is the spoken and shown
+ * method, so it is the best source for technique and the worst for quantities,
+ * because people say "a good glug" far more often than they write it.
  */
-export const SourceKind = z.enum(["description", "caption", "title", "manual"]);
+export const SourceKind = z.enum(["description", "caption", "video", "title", "manual"]);
 export type SourceKind = z.infer<typeof SourceKind>;
 
 /** 0 = pure guess, 1 = stated unambiguously in the source. */

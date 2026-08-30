@@ -156,7 +156,7 @@ def _coerce_quantity(
     return qty, text, unit
 
 
-def _to_ingredient(raw: dict[str, Any]) -> Ingredient | None:
+def _to_ingredient(raw: dict[str, Any], source: SourceKind) -> Ingredient | None:
     name = _clean_name(str(raw.get("name") or ""))
     if not name:
         return None
@@ -169,15 +169,24 @@ def _to_ingredient(raw: dict[str, Any]) -> Ingredient | None:
         unit=unit,
         prep=prep.strip() if isinstance(prep, str) and prep.strip() else None,
         optional=bool(raw.get("optional", False)),
-        source=SourceKind.DESCRIPTION,
-        # Description-sourced extraction of a stated quantity is high-confidence;
-        # a quantity we had to interpret is not. Calibrated against the Phase 2.2
-        # eval set once it exists.
-        confidence=0.9 if qty is not None else 0.6,
+        source=source,
+        # A stated quantity is high-confidence; one we had to interpret is not.
+        # Video is discounted against description across the board: a written
+        # "200g" is the creator's considered figure, while the same number heard
+        # once in speech may be a misheard "two hundred" or an aside. Calibrated
+        # against the Phase 2.2 eval set once it exists — these are priors, not
+        # measurements, and the eval is what turns them into the latter.
+        confidence=_confidence(qty is not None, source),
     )
 
 
-def _to_steps(raw_steps: list[dict[str, Any]]) -> list[Step]:
+def _confidence(has_qty: bool, source: SourceKind) -> float:
+    if source is SourceKind.VIDEO:
+        return 0.75 if has_qty else 0.5
+    return 0.9 if has_qty else 0.6
+
+
+def _to_steps(raw_steps: list[dict[str, Any]], source: SourceKind) -> list[Step]:
     steps: list[Step] = []
     for raw in raw_steps:
         text = str(raw.get("text") or "").strip()
@@ -194,7 +203,7 @@ def _to_steps(raw_steps: list[dict[str, Any]]) -> list[Step]:
                 text=text,
                 duration_s=int(duration) if isinstance(duration, int | float) else None,
                 temp_c=float(temp) if isinstance(temp, int | float) else None,
-                source=SourceKind.DESCRIPTION,
+                source=source,
             )
         )
     return steps
@@ -213,18 +222,42 @@ def _to_yield(data: dict[str, Any]) -> Yield | None:
     )
 
 
+def _insufficient_reason(found_recipe: bool, source: SourceKind) -> InsufficientReason:
+    """Why there is no recipe, phrased for the source that was actually read.
+
+    `description_is_link_only` is a true statement about a description and a
+    meaningless one about a video. Getting this wrong would put the wrong
+    explanation in front of the reader on the no-recipe page, which reads the
+    reason verbatim.
+    """
+    if source is SourceKind.VIDEO:
+        return (
+            InsufficientReason.NO_INGREDIENTS_FOUND
+            if found_recipe
+            else InsufficientReason.NOT_A_RECIPE_VIDEO
+        )
+    return (
+        InsufficientReason.NO_INGREDIENTS_FOUND
+        if found_recipe
+        else InsufficientReason.DESCRIPTION_IS_LINK_ONLY
+    )
+
+
 def to_result(
     response: LlmResponse,
     *,
     video_id: str,
     title: str,
     creator: Creator,
+    source: SourceKind = SourceKind.DESCRIPTION,
 ) -> ExtractionOk | ExtractionInsufficient:
     """Map raw model output onto the contract, or explain why there is no recipe."""
     data = response.data
 
     ingredients = [
-        ing for raw in data.get("ingredients", []) if (ing := _to_ingredient(raw)) is not None
+        ing
+        for raw in data.get("ingredients", [])
+        if (ing := _to_ingredient(raw, source)) is not None
     ]
 
     # An empty ingredient list is the answer, not an error. ADR 0001 measured
@@ -233,12 +266,8 @@ def to_result(
         return ExtractionInsufficient(
             status="insufficient_source_material",
             video_id=video_id,
-            reason=(
-                InsufficientReason.NO_INGREDIENTS_FOUND
-                if data.get("found_recipe")
-                else InsufficientReason.DESCRIPTION_IS_LINK_ONLY
-            ),
-            sources_tried=[SourceKind.DESCRIPTION],
+            reason=_insufficient_reason(bool(data.get("found_recipe")), source),
+            sources_tried=[source],
         )
 
     recipe = Recipe(
@@ -246,14 +275,85 @@ def to_result(
         title=title,
         creator=creator,
         ingredients=ingredients,
-        steps=_to_steps(data.get("steps", [])),
+        steps=_to_steps(data.get("steps", []), source),
         recipe_yield=_to_yield(data),
         equipment=[e.strip() for e in data.get("equipment", []) if str(e).strip()],
-        sources=[SourceKind.DESCRIPTION],
+        sources=[source],
         conflicts=[],
         extracted_at=datetime.now(UTC),
     )
     return ExtractionOk(status="ok", recipe=recipe)
+
+
+#: The description prompt's rules, restated for a source that is spoken rather
+#: than written. Rule 1 matters MORE here, not less: people say "a good glug of
+#: oil" out loud far more often than they write it, so the pressure to invent a
+#: number is higher. Validated by scripts/spike_video.py before this shipped —
+#: on the first real video it left 6 of 17 quantities null rather than guessing.
+VIDEO_PROMPT = """You are extracting a structured recipe by WATCHING a cooking \
+video. Use everything: what the cook says, what is shown on screen, and any text \
+overlays or on-screen ingredient cards.
+
+Rules, in order of importance:
+
+1. NEVER invent a quantity. If the cook says "to taste", "a good handful", "as \
+required", or shows an amount without naming it, set qty to null and put the \
+spoken wording in qty_text. A plausible number nobody stated is worse than no \
+number. This matters more here than in written text, because speech is vaguer.
+2. Prefer an on-screen ingredient card or text overlay over the spoken word when \
+they disagree — the card is the creator's considered version.
+3. For a range like "8-10 cloves", set qty to the LOWER bound and copy the full \
+range into qty_text. Do not average it.
+4. qty_text is ONLY for wording a number cannot carry. An exact number leaves it \
+null.
+5. Write ingredient names in lower case. Keep the English name when both are \
+spoken.
+6. Convert Fahrenheit to Celsius. Give durations in seconds.
+7. Steps are the method in the order performed. Do not invent steps.
+8. If this is genuinely not a cooking video, set found_recipe to false and return \
+empty arrays. That is a correct answer, not a failure.
+
+TITLE: {title}
+"""
+
+
+def build_video_prompt(title: str) -> str:
+    return VIDEO_PROMPT.format(title=title)
+
+
+async def extract_recipe_from_video(
+    provider: LlmProvider,
+    *,
+    video_id: str,
+    title: str,
+    creator: Creator,
+) -> tuple[ExtractionOk | ExtractionInsufficient, LlmResponse]:
+    """Extract by having the model watch the video itself.
+
+    The fallback for the roughly one description in five that carries no recipe
+    (ADR 0001). Costs about fifty times the input tokens of the description path
+    and takes tens of seconds, so it is never the first thing tried — see
+    ADR 0006 and `run_pipeline`.
+
+    No download happens anywhere in this path: the YouTube URL is handed to
+    Gemini, and Google reads a video already on Google's platform.
+    """
+    response = await provider.complete_json(
+        prompt=build_video_prompt(title),
+        schema=RESPONSE_SCHEMA,
+        temperature=0.0,
+        video_url=f"https://www.youtube.com/watch?v={video_id}",
+    )
+    return (
+        to_result(
+            response,
+            video_id=video_id,
+            title=title,
+            creator=creator,
+            source=SourceKind.VIDEO,
+        ),
+        response,
+    )
 
 
 async def extract_recipe(

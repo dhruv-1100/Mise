@@ -52,6 +52,9 @@ class SourceKind(StrEnum):
 
     DESCRIPTION = "description"
     CAPTION = "caption"
+    #: The model watching the video itself (ADR 0006). Reads on the same rule as
+    #: CAPTION: best source for technique, worst for quantities.
+    VIDEO = "video"
     TITLE = "title"
     MANUAL = "manual"
 
@@ -189,6 +192,10 @@ class JobStage(StrEnum):
     FETCHING = "fetching"
     NORMALIZING = "normalizing"
     EXTRACTING = "extracting"
+    #: Only when the description carried no recipe — see ADR 0006. Its own stage
+    #: because it takes tens of seconds, and a progress screen that sat on
+    #: "extracting" that long would look stuck rather than busy.
+    WATCHING = "watching"
     CANONICALISING = "canonicalising"
 
 

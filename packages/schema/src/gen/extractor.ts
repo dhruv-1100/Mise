@@ -70,6 +70,13 @@ export enum JobStage {
   JOB_STAGE_NORMALIZING = 2,
   JOB_STAGE_EXTRACTING = 3,
   JOB_STAGE_CANONICALISING = 4,
+  /**
+   * JOB_STAGE_WATCHING - The description carried no recipe, so the model is watching the video
+   * instead (ADR 0006). Its own stage because it takes tens of seconds rather
+   * than the few the other stages take, and a progress screen that sat on
+   * "extracting" for half a minute would look stuck rather than busy.
+   */
+  JOB_STAGE_WATCHING = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -90,6 +97,9 @@ export function jobStageFromJSON(object: any): JobStage {
     case 4:
     case "JOB_STAGE_CANONICALISING":
       return JobStage.JOB_STAGE_CANONICALISING;
+    case 5:
+    case "JOB_STAGE_WATCHING":
+      return JobStage.JOB_STAGE_WATCHING;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -109,6 +119,8 @@ export function jobStageToJSON(object: JobStage): string {
       return "JOB_STAGE_EXTRACTING";
     case JobStage.JOB_STAGE_CANONICALISING:
       return "JOB_STAGE_CANONICALISING";
+    case JobStage.JOB_STAGE_WATCHING:
+      return "JOB_STAGE_WATCHING";
     case JobStage.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

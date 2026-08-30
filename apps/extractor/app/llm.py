@@ -59,7 +59,14 @@ class LlmResponse:
 
 
 class LlmProvider(Protocol):
-    """Structured JSON completion. The only shape the pipeline knows about."""
+    """Structured JSON completion. The only shape the pipeline knows about.
+
+    `video_url` is the one concession to a media model: when set, the provider
+    asks the model to watch that video alongside the prompt. It stays optional
+    and keyword-only so every existing caller is unchanged, and so a provider
+    that cannot see video can refuse it explicitly rather than ignoring it and
+    silently answering from the prompt alone. See ADR 0006.
+    """
 
     async def complete_json(
         self,
@@ -67,6 +74,7 @@ class LlmProvider(Protocol):
         prompt: str,
         schema: dict[str, Any],
         temperature: float = 0.0,
+        video_url: str | None = None,
     ) -> LlmResponse: ...
 
 
@@ -88,8 +96,19 @@ class FakeProvider:
         prompt: str,
         schema: dict[str, Any],
         temperature: float = 0.0,
+        video_url: str | None = None,
     ) -> LlmResponse:
-        self.calls.append({"prompt": prompt, "schema": schema, "temperature": temperature})
+        # video_url is recorded rather than ignored: the fallback's whole point
+        # is that the second call watches the video, and a test asserting the
+        # fallback happened needs to see that it did.
+        self.calls.append(
+            {
+                "prompt": prompt,
+                "schema": schema,
+                "temperature": temperature,
+                "video_url": video_url,
+            }
+        )
         if not self.responses:
             raise LlmError("FakeProvider ran out of queued responses")
         nxt = self.responses.pop(0)
@@ -131,6 +150,7 @@ class GeminiProvider:
         prompt: str,
         schema: dict[str, Any],
         temperature: float = 0.0,
+        video_url: str | None = None,
     ) -> LlmResponse:
         from google.genai import types
 
@@ -144,13 +164,26 @@ class GeminiProvider:
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
 
+        # A YouTube URL passed straight to the model: nothing is downloaded here
+        # and no scraper is involved — Google processes a video already on
+        # Google's platform. ADR 0006 covers why that is a different act from
+        # the captions.download 401 that ADR 0001 documented.
+        contents: Any = prompt
+        if video_url is not None:
+            contents = types.Content(
+                parts=[
+                    types.Part(file_data=types.FileData(file_uri=video_url, mime_type="video/*")),
+                    types.Part(text=prompt),
+                ]
+            )
+
         tried: list[str] = []
         last_error: Exception | None = None
 
         for model in self._model_chain:
             try:
                 response = await self._client.aio.models.generate_content(
-                    model=model, contents=prompt, config=config
+                    model=model, contents=contents, config=config
                 )
             except Exception as exc:
                 if not _is_worth_falling_back(exc):
