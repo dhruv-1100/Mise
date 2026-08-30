@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "migrate": "node --env-file-if-exists=../../.env scripts/migrate.mjs"
+    "migrate": "node --env-file-if-exists=../../.env scripts/migrate.mjs",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@auth/pg-adapter": "^1.11.3",
@@ -27,6 +29,7 @@
   "devDependencies": {
     "@auth/core": "0.41.3",
     "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.1.16",
     "@types/node": "^20.19.9",
     "@types/pg": "^8.23.1",
