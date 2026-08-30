@@ -43,6 +43,16 @@ MAX_QUEUE_DEPTH = 100
 MAX_ATTEMPTS = 3
 #: Extracted recipes are cached for a week; a description rarely changes.
 CACHE_TTL_SECONDS = 7 * 24 * 3600
+#: "No recipe here" is cached for hours, not a week.
+#:
+#: A successful extraction is a fact about the video. An insufficient one is a
+#: statement about what THIS pipeline could get out of it today, and that
+#: changes: ADR 0006 added a video fallback that recovers exactly these cases,
+#: and every video already cached as insufficient kept serving the old answer
+#: for up to seven days afterwards — the improvement shipped and users could not
+#: see it. Short enough that a pipeline change reaches everyone the same day,
+#: long enough that retrying a failing video in one sitting is still free.
+NEGATIVE_CACHE_TTL_SECONDS = 6 * 3600
 #: Job records outlive the work so a client can still poll a finished job.
 JOB_TTL_SECONDS = 24 * 3600
 
@@ -73,6 +83,19 @@ def _now() -> datetime:
 
 def _dump(job: Job) -> str:
     return job.model_dump_json(by_alias=True)
+
+
+def _cache_ttl_for(recipe_json: str) -> int:
+    """How long this result is worth keeping.
+
+    Reads the payload rather than taking a flag, because `succeed` is called
+    from two places and a flag is one more thing a caller can get wrong. The
+    marker is the same `status` field the BFF discriminates on, so the two
+    cannot disagree about what an insufficient result looks like.
+    """
+    if '"insufficient_source_material"' in recipe_json:
+        return NEGATIVE_CACHE_TTL_SECONDS
+    return CACHE_TTL_SECONDS
 
 
 def backoff_seconds(attempt: int, *, base: float = 2.0, cap: float = 60.0) -> float:
@@ -178,7 +201,9 @@ class ExtractionQueue:
 
     async def succeed(self, job: Job, recipe_json: str) -> Job:
         await self.redis.set(
-            CACHE_KEY.format(video_id=job.video_id), recipe_json, ex=CACHE_TTL_SECONDS
+            CACHE_KEY.format(video_id=job.video_id),
+            recipe_json,
+            ex=_cache_ttl_for(recipe_json),
         )
         updated = job.model_copy(
             update={

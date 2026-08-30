@@ -12,7 +12,9 @@ import pytest
 
 from app.queue import (
     CACHE_KEY,
+    CACHE_TTL_SECONDS,
     DLQ_KEY,
+    NEGATIVE_CACHE_TTL_SECONDS,
     QUEUE_KEY,
     ExtractionQueue,
     QueueFull,
@@ -25,17 +27,26 @@ OTHER = "bbbbbbbbbbb"
 
 
 class FakeRedis:
-    """In-memory stand-in. No TTL simulation — expiry is Redis's job, not ours."""
+    """In-memory stand-in.
+
+    Expiry is not simulated — nothing here disappears on a timer, because that
+    is Redis's job. The TTL *value* is recorded, though: how long a result is
+    kept is a decision this code makes rather than a mechanic it inherits, and
+    since ADR 0006 it differs between a recipe and a "no recipe here". See
+    `test_negative_results_expire_sooner`.
+    """
 
     def __init__(self) -> None:
         self.values: dict[str, str] = {}
         self.lists: dict[str, list[str]] = {}
+        self.ttls: dict[str, int | None] = {}
 
     async def get(self, key):
         return self.values.get(key)
 
     async def set(self, key, value, ex=None):
         self.values[key] = value
+        self.ttls[key] = ex
 
     async def delete(self, *keys):
         for k in keys:
@@ -183,6 +194,48 @@ class TestSuccess:
         job = run(queue.claim())
         run(queue.succeed(job, json.dumps({"videoId": VIDEO, "title": "T"})))
         assert run(queue.cached_recipe(VIDEO))["title"] == "T"
+
+    def test_a_recipe_is_kept_for_a_week(self, queue, redis):
+        run(queue.enqueue(VIDEO))
+        job = run(queue.claim())
+        run(queue.succeed(job, json.dumps({"videoId": VIDEO, "title": "T"})))
+        assert redis.ttls[CACHE_KEY.format(video_id=VIDEO)] == CACHE_TTL_SECONDS
+
+    def test_negative_results_expire_sooner(self, queue, redis):
+        """A "no recipe here" must not outlive the pipeline that produced it.
+
+        This is the bug ADR 0006 shipped with. The video fallback recovers
+        exactly the link-only descriptions that produce this result — and every
+        video already cached as insufficient went on serving the old answer for
+        up to seven days after the fallback deployed. The improvement was live
+        and unreachable.
+
+        A successful extraction is a fact about the video. An insufficient one
+        is a statement about what this pipeline could manage today.
+        """
+        run(queue.enqueue(VIDEO))
+        job = run(queue.claim())
+        run(
+            queue.succeed(
+                job,
+                json.dumps(
+                    {
+                        "status": "insufficient_source_material",
+                        "videoId": VIDEO,
+                        "reason": "description_is_link_only",
+                        "sourcesTried": ["description"],
+                    }
+                ),
+            )
+        )
+
+        ttl = redis.ttls[CACHE_KEY.format(video_id=VIDEO)]
+        assert ttl == NEGATIVE_CACHE_TTL_SECONDS
+        assert ttl < CACHE_TTL_SECONDS
+
+        # Still cached, though: retrying the same failing video in one sitting
+        # should not pay for a second extraction.
+        assert run(queue.cached_recipe(VIDEO))["reason"] == "description_is_link_only"
 
 
 class TestFailureAndRetry:
