@@ -115,9 +115,18 @@ resource "google_cloud_run_v2_service" "extractor" {
       }
     }
 
-    // Extraction takes 10-40 seconds against the LLM. The default 5 minutes is
-    // enough, but say so explicitly rather than inheriting it.
-    timeout = "300s"
+    // Long enough for the slowest path there is.
+    //
+    // The original 300s was written when extraction was "10-40 seconds against
+    // the LLM". Measured in production since: a description-only extraction
+    // runs 12-90s, and one that falls back to watching the video (ADR 0006)
+    // adds the whole video call on top — a real job spent 149.8s on the
+    // description alone before watching began, and the 300s cut the stream
+    // while the worker was still going.
+    //
+    // This is the ceiling the gRPC stream timeout sits under; the two move
+    // together. See STREAM_TIMEOUT_SECONDS in app/grpc_server.py.
+    timeout = "900s"
   }
 
   lifecycle {

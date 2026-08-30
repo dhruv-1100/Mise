@@ -121,7 +121,9 @@ async def lifespan(app: FastAPI):
 #: polls Redis; cheap, and it keeps the queue a plain data structure.
 SSE_POLL_SECONDS = 0.5
 #: A job that never terminates must not hold a connection open forever.
-SSE_TIMEOUT_SECONDS = 300
+#: Matches STREAM_TIMEOUT_SECONDS in grpc_server.py — the two transports serve
+#: the same queue and a job is not more patient over one than the other.
+SSE_TIMEOUT_SECONDS = 600
 
 
 app = FastAPI(

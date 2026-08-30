@@ -36,16 +36,30 @@ if extraction is unreliable.
 | Candidate generation (Phase 10) | < 30ms | — | — | — |
 | Ranking, 500 candidates (Phase 10) | < 50ms | — | — | — |
 
-**First production measurement, 2026-08-28.** One extraction against the
-deployed Cloud Run service: **91.5s** end to end, from `Extract` accepted to
-`SUCCEEDED`. A single sample on a cold-ish instance, so it is not a p50 and the
-cells above stay empty — but it is more than double the "10-40 seconds" the
-pipeline's own comments assume, and it would miss the 60s target above.
+**Production measurements, 2026-08-28.** Nine real extractions against the
+deployed Cloud Run service. Still too few for a percentile, so the cells above
+stay empty, but enough to say the 60s target is not currently met.
 
-Worth knowing before Phase 7 sets an SLO against a number nobody has measured.
-The decomposition that matters and does not exist yet: cold start vs. YouTube
-fetch vs. Gemini call. `GetRecipe` on a warm instance round-trips in **0.6s**,
-so the cold start is not the whole story.
+| Path | Observed |
+| --- | --- |
+| Description only | 12.7s, 14.7s, 23.1s, 53.9s, 91.5s |
+| Falls back to watching the video (ADR 0006) | 149.8s to reach `watching`, then over 300s total |
+| `GetRecipe` on a warm instance | 0.6s |
+
+Three things this changes:
+
+1. **The "10-40 seconds" in the pipeline's own comments is wrong.** Even the
+   description-only path runs 12-90s.
+2. **The 60s target above is missed by the slow half.** Phase 7 should not
+   write an SLO around a number nobody had measured.
+3. **The fallback exceeded the 300s stream timeout**, which cut the connection
+   while the worker was still going. The job completed and cached; the person
+   watching had been told it failed. Timeouts raised to 600s (stream) and 900s
+   (Cloud Run) — see `docs/adr/0005-cloud-run-topology.md`.
+
+The decomposition that matters and still does not exist: cold start vs. YouTube
+fetch vs. Gemini call. One description stage took 149.8s on its own, which no
+current instrumentation explains.
 
 ## Product
 

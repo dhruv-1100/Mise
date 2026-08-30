@@ -61,6 +61,19 @@ mid-extraction — the tab is closed, the phone sleeps — the job stalls until 
 later request wakes an instance, at which point the worker claims it again and
 finishes it. Nothing is lost; it is late.
 
+**Observed in production on 2026-08-28, and it behaved as described.** A job
+that fell back to watching the video ran past the stream timeout; the client
+disconnected and the job stopped. A later request woke an instance, the worker
+finished it, and the recipe cached — 29 ingredients from a description that had
+none. "Late, not lost" is now measured rather than predicted.
+
+What that run also showed is that the timeouts were set for a pipeline that no
+longer exists. The description stage alone took 149.8s before `watching` began,
+and the 300s stream timeout cut the connection while the worker was still
+working — so the job succeeded and the person watching was told it failed. The
+stream timeout is now 600s and Cloud Run's request timeout 900s. Those two move
+together: the second is the ceiling the first sits under.
+
 This was chosen deliberately over `min_instance_count = 1` with CPU always
 allocated, which drains the queue continuously and costs roughly $15–20/month.
 At the current scope — a personal tool, one user, extractions started

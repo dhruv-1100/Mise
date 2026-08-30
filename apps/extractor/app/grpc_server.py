@@ -30,7 +30,17 @@ logger = logging.getLogger(__name__)
 #: structure. Swap for a Redis channel when the cost shows up in Phase 7.
 POLL_SECONDS = 0.5
 #: A job that never terminates must not hold a stream open forever.
-STREAM_TIMEOUT_SECONDS = 300
+#:
+#: Raised from 300s after a real production run blew through it. The video
+#: fallback (ADR 0006) runs only after the description stage has already
+#: finished, so the two costs add: one measured job spent 149.8s on the
+#: description before `watching` even began. At 300s the stream was cut while
+#: the job was still working — it completed fine and cached, but the person
+#: watching had been told it failed.
+#:
+#: Must stay below Cloud Run's request timeout in infra/cloudrun.tf, which is
+#: what actually ends the connection. These two move together.
+STREAM_TIMEOUT_SECONDS = 600
 
 _STATE = {
     JobState.QUEUED: pb.JOB_STATE_QUEUED,
