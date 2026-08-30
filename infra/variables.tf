@@ -201,6 +201,22 @@ variable "google_oauth_client_id" {
   description = "Google OAuth 2.0 client id for sign-in. Created in the GCP console, not by Terraform — see docs/adr/0003-auth-and-sessions.md."
   type        = string
   default     = ""
+
+  // Checked because it silently was not, once. A value pasted across a wrapped
+  // terminal arrived as
+  //
+  //     726000312787-\n1j51 mic4sq41eb0mk7r|fs7iooj1ucbo.app\ns.googleusercontent.com
+  //
+  // — two newlines, a space and a pipe — and everything downstream accepted it.
+  // Terraform stored it, Vercel served it, Auth.js built an authorisation URL
+  // out of it, and the first sign of trouble was Google answering
+  // "Error 401: invalid_client" on a page that says nothing about why.
+  //
+  // Google's format is exact, so this is worth asserting rather than trusting.
+  validation {
+    condition     = var.google_oauth_client_id == "" || can(regex("^[0-9]+-[a-z0-9]+\\.apps\\.googleusercontent\\.com$", var.google_oauth_client_id))
+    error_message = "google_oauth_client_id must look like 123456789-abc123.apps.googleusercontent.com — no spaces, no line breaks. Re-copy it from the GCP console; a wrapped paste corrupts it silently."
+  }
 }
 
 variable "google_oauth_client_secret" {
@@ -208,6 +224,16 @@ variable "google_oauth_client_secret" {
   type        = string
   default     = ""
   sensitive   = true
+
+  // The same paste corrupts this just as easily, and its failure is worse: a
+  // bad secret is accepted at the authorisation step and only rejected during
+  // the token exchange, so sign-in appears to work right up until the callback.
+  // No format is asserted beyond "no whitespace" — Google has changed the
+  // shape of these before and a stale pattern would reject a valid secret.
+  validation {
+    condition     = var.google_oauth_client_secret == "" || can(regex("^\\S+$", var.google_oauth_client_secret))
+    error_message = "google_oauth_client_secret contains whitespace or a line break. Re-copy it from the GCP console."
+  }
 }
 
 variable "posthog_key" {

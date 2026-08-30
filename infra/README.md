@@ -253,6 +253,17 @@ needed. The `youtube.readonly` scope for claiming a channel is requested
 separately and only when someone claims (ADR 0003), and *that* is the one that
 needs Google verification past 100 users.
 
+**Copy the client ID and secret carefully.** A value pasted across a wrapped
+terminal arrives with newlines and spaces inside it, Terraform stores it, Vercel
+serves it, and the only symptom is Google answering `Error 401: invalid_client`
+on a page that explains nothing. That happened here. Both variables now have a
+format check that fails at `terraform apply` instead, but the easiest guard is
+to paste into a text editor first and confirm it is one unbroken line:
+
+```
+123456789012-abc123def456ghi789jkl.apps.googleusercontent.com
+```
+
 **2. A signing secret.**
 
 ```bash
