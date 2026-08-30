@@ -102,15 +102,20 @@ class TestHappyPath:
         assert run(worker(queue).run_once()) is None
 
 
+#: Neither the description nor the video had anything in it.
+EMPTY = {"found_recipe": False, "ingredients": [], "steps": [], "equipment": []}
+
+
 class TestInsufficient:
     def test_no_recipe_is_a_success_not_a_retry(self, queue):
         # "This video has no recipe" is a correct answer about the video.
         # Retrying it would pay the same cost for the same answer.
+        #
+        # Two responses: the description finds nothing, then the video fallback
+        # runs and also finds nothing. That is the case this asserts — a genuine
+        # negative, not a fallback that could not run.
         run(queue.enqueue(VIDEO))
-        w = worker(
-            queue,
-            responses=[{"found_recipe": False, "ingredients": [], "steps": [], "equipment": []}],
-        )
+        w = worker(queue, responses=[EMPTY, EMPTY])
         job = run(w.run_once())
 
         assert job.state is JobState.SUCCEEDED
@@ -119,16 +124,56 @@ class TestInsufficient:
 
     def test_the_negative_result_is_cached_too(self, queue):
         run(queue.enqueue(VIDEO))
-        run(
-            worker(
-                queue,
-                responses=[
-                    {"found_recipe": False, "ingredients": [], "steps": [], "equipment": []}
-                ],
-            ).run_once()
-        )
+        run(worker(queue, responses=[EMPTY, EMPTY]).run_once())
         cached = run(queue.cached_recipe(VIDEO))
         assert cached["status"] == "insufficient_source_material"
+
+    def test_a_fallback_that_could_not_run_retries_instead_of_caching(self, queue):
+        """The bug a real production run surfaced.
+
+        Every model in the chain 503'd on the video call, the description's
+        "no recipe here" was cached as though it were the final answer, and the
+        reader was told the creator keeps their recipe on their own site — when
+        the truth was that we never managed to look at the video.
+
+        "The description has no recipe" and "we could not check the video" are
+        different facts, and only one of them is final.
+        """
+        run(queue.enqueue(VIDEO))
+        w = worker(queue, responses=[EMPTY, LlmError("503 UNAVAILABLE")])
+        job = run(w.run_once())
+
+        assert job.state is JobState.QUEUED
+        assert job.attempt == 1
+        assert w.stats.retried == 1
+        # `error` is deliberately cleared on a re-queue and only kept on the
+        # final dead-letter, so the code is asserted there instead — see
+        # test_exhausted_attempts_surface_the_model_being_down below.
+
+        # Nothing cached: a retry must actually re-run rather than read back the
+        # answer that caused it.
+        assert run(queue.cached_recipe(VIDEO)) is None
+
+    def test_exhausted_attempts_surface_the_model_being_down(self, queue):
+        # If the video call never gets through, the honest outcome is
+        # "llm_unavailable" — which JobProgress already words as "The model was
+        # unavailable each time we tried" — and NOT a cached page telling the
+        # reader the creator keeps their recipe elsewhere.
+        run(queue.enqueue(VIDEO))
+        w = Worker(
+            queue=queue,
+            fetcher=FakeFetcher(metadata()),
+            provider=FakeProvider(
+                responses=[EMPTY, LlmError("503"), EMPTY, LlmError("503"), EMPTY, LlmError("503")]
+            ),
+            sleep=Recorder(),
+        )
+        for _ in range(queue.max_attempts):
+            job = run(w.run_once())
+
+        assert job.state is JobState.FAILED
+        assert job.error.code == "llm_unavailable"
+        assert run(queue.cached_recipe(VIDEO)) is None
 
 
 class TestFailure:

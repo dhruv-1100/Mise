@@ -89,6 +89,20 @@ class Worker:
         if isinstance(out.result, ExtractionOk):
             self.stats.succeeded += 1
             recipe_json = out.result.recipe.model_dump_json(by_alias=True)
+        elif out.fallback_error is not None:
+            # The description had no recipe AND the video fallback could not run
+            # — every model in the chain was saturated. That is not the same as
+            # "there is no recipe here", and caching it as though it were tells
+            # the reader the creator keeps their recipe elsewhere when the truth
+            # is that we never managed to look.
+            #
+            # Retried rather than cached, using the backoff the queue already
+            # has: a 503 across the whole chain is exactly the transient upstream
+            # failure that machinery exists for. If every attempt fails the job
+            # dead-letters as `llm_unavailable`, which the progress screen
+            # already words honestly.
+            self.stats.insufficient += 1
+            return await self._fail(job, "llm_unavailable", out.fallback_error)
         else:
             # "No recipe here" is a correct answer about the video, not a
             # failure to retry. Caching it stops us paying for the same

@@ -53,6 +53,13 @@ class PipelineOutput:
     metadata: VideoMetadata
     stats: PipelineStats
     #: Canonical gram/ml values, parallel to `result.recipe.ingredients`.
+    #: Set when the video fallback was attempted and failed for a transient
+    #: reason — every model in the chain 503ing, most often. Distinct from the
+    #: fallback running and finding nothing: the first means "we do not know
+    #: yet", the second means "there is no recipe". They must not be cached the
+    #: same way, and they must not be told to the reader the same way.
+    fallback_error: str | None = None
+
     #: Empty when the result is insufficient.
     canonical: tuple[CanonicalQuantity, ...] = field(default_factory=tuple)
 
@@ -119,6 +126,7 @@ async def run_pipeline(
     # cheap path runs for every video and this runs only where the cheap path
     # came back empty-handed.
     watched: LlmResponse | None = None
+    fallback_error: str | None = None
     if watch_video and isinstance(result, ExtractionInsufficient):
         await stage(JobStage.WATCHING)
         try:
@@ -129,17 +137,18 @@ async def run_pipeline(
                 creator=creator,
             )
         except LlmError as exc:
-            # Best-effort, deliberately. At this point the description stage has
-            # already produced a correct, complete answer — "there is no recipe
-            # in the description". Letting a failure of the *optional* second
-            # attempt propagate would discard that answer and fail the whole
-            # extraction, so a quota limit or a saturated model would turn a
-            # working result into a retry loop. The fallback can only ever add.
+            # Best-effort, deliberately: the description stage has already
+            # produced a correct answer and discarding it would be worse than
+            # keeping it. But the caller is told the fallback did not get to
+            # run, because "the description has no recipe" and "we could not
+            # check the video" are different facts and only one of them is
+            # final.
             logger.warning(
                 "video fallback failed for %s, keeping description result: %s",
                 metadata.video_id,
                 exc,
             )
+            fallback_error = str(exc)
         else:
             # Only take the video's answer if it actually found something. A
             # video extraction that also comes back empty must not overwrite the
@@ -159,6 +168,7 @@ async def run_pipeline(
 
     return PipelineOutput(
         result=result,
+        fallback_error=fallback_error,
         metadata=metadata,
         canonical=canonical,
         stats=PipelineStats(
