@@ -52,9 +52,15 @@ test.describe("cook mode", () => {
     // laptop propped open in a kitchen, so it is still worth covering there.
     test.skip(isMobile, "no hardware keyboard on a touch device");
 
-    await page.keyboard.press("ArrowRight");
+    // Pressed on `body`, not via page.keyboard, which delivers to whatever
+    // happens to have focus. Nothing here had established focus, so the event
+    // reached the window listener or not depending on timing — this spec passed
+    // twice and failed once before that was noticed, which makes the two passes
+    // worth no more than the failure.
+    const body = page.locator("body");
+    await body.press("ArrowRight");
     await expect(page.getByText("Step 2 of 3")).toBeVisible();
-    await page.keyboard.press("ArrowLeft");
+    await body.press("ArrowLeft");
     await expect(page.getByText("Step 1 of 3")).toBeVisible();
   });
 });

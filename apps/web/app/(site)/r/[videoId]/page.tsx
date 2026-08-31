@@ -100,6 +100,15 @@ async function PersonalActions({ videoId, channelId }: { videoId: string; channe
             {cooks.lastCookedAt !== null && ` · last ${relativeTime(cooks.lastCookedAt)}`}
           </span>
         )}
+        {/* Any signed-in reader can keep their own version. Distinct from the
+            creator link below, which corrects the recipe for everybody. */}
+        <Link
+          href={`/r/${videoId}/mine`}
+          className="flex h-11 items-center text-[15px] font-semibold text-accent-deep"
+        >
+          Make it mine
+        </Link>
+
         {canEdit && (
           <Link
             href={`/r/${videoId}/edit`}
@@ -120,7 +129,12 @@ export default async function RecipePage({
   params: Promise<{ videoId: string }>;
 }) {
   const { videoId } = await params;
-  const extraction = await loadExtraction(videoId);
+  // Read the session here as well as in PersonalActions: the recipe itself now
+  // depends on who is asking, because a reader's own edited version shadows the
+  // extractor's. The page is already dynamic — SiteHeader reads cookies — so
+  // this costs a session decode, not a render mode.
+  const viewer = isAuthConfigured ? (await auth())?.user : undefined;
+  const extraction = await loadExtraction(videoId, viewer?.id);
 
   // Three outcomes, not two. A video whose description carries no recipe is a
   // normal result that the extractor explains, and turning that explanation
@@ -180,6 +194,17 @@ export default async function RecipePage({
         </p>
 
         <PersonalActions videoId={videoId} channelId={recipe.creator.channelId} />
+
+        {extraction.personal === true && (
+          /* Without this the page silently lies: it shows numbers the creator
+             never wrote, with their name at the top, and nothing says why. */
+          <p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-accent-wash px-3.5 py-2.5 text-[13px] text-accent-deep">
+            <span className="font-semibold">You have edited this recipe.</span>
+            <Link href={`/r/${videoId}/mine`} className="font-semibold underline underline-offset-2">
+              Edit again
+            </Link>
+          </p>
+        )}
 
         <ServingStepper recipe={recipe} />
 

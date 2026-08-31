@@ -3,6 +3,7 @@ import "server-only";
 import { Insufficient, type InsufficientReason, Recipe } from "@mise/schema";
 import { getRecipe } from "@/lib/extractor";
 import { getOverride } from "@/lib/overrides";
+import { getPersonalRecipe } from "@/lib/personal";
 
 /**
  * Why a recipe page has nothing to render.
@@ -13,7 +14,8 @@ import { getOverride } from "@/lib/overrides";
  * had already told the person their extraction succeeded.
  */
 export type Extraction =
-  | { status: "ok"; recipe: Recipe }
+  /** `personal` marks a recipe the reader has edited, so the page can say so. */
+  | { status: "ok"; recipe: Recipe; personal?: boolean }
   | { status: "insufficient"; videoId: string; reason: InsufficientReason }
   | { status: "missing" };
 
@@ -31,7 +33,25 @@ export type Extraction =
  * question to get wrong. `getOverride` returns null when the database is not
  * configured, so this path is unchanged on a deployment with no accounts.
  */
-export async function loadExtraction(videoId: string): Promise<Extraction> {
+export async function loadExtraction(
+  videoId: string,
+  userId?: string | undefined,
+): Promise<Extraction> {
+  // Precedence, most specific first:
+  //
+  //   1. this reader's own edit    — "I use less chilli than he does"
+  //   2. the creator's correction  — authoritative for everyone
+  //   3. the extractor's output
+  //
+  // A personal edit wins over a creator's on purpose. The creator is right
+  // about what their recipe is; the reader is right about what they want to
+  // cook. Reverting a personal edit falls back through the same chain, so the
+  // creator's version is never lost, only shadowed.
+  if (userId !== undefined) {
+    const mine = await getPersonalRecipe(userId, videoId).catch(() => null);
+    if (mine !== null) return { status: "ok", recipe: mine.recipe, personal: true };
+  }
+
   const override = await getOverride(videoId).catch(() => null);
   if (override !== null) return { status: "ok", recipe: override };
 

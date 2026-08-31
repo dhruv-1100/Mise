@@ -22,7 +22,23 @@ import type { Ingredient, Recipe, Step } from "@mise/schema";
  *   - step indices must be contiguous from 1, so they are renumbered on submit
  *     rather than carried from whatever the extractor produced
  */
-export function RecipeEditor({ recipe }: { recipe: Recipe }) {
+export function RecipeEditor({
+  recipe,
+  /**
+   * Where the edit goes. Two callers with the same form and different meanings:
+   * `/api/recipes/:id` is the creator's correction, authoritative for everyone;
+   * `/api/recipes/:id/mine` is this reader's own copy. The form is identical
+   * because the thing being edited is — only who sees the result differs.
+   */
+  endpoint = `/api/recipes/${recipe.videoId}`,
+  saveLabel = "Publish my version",
+  revertLabel = "Revert to what Mise extracted",
+}: {
+  recipe: Recipe;
+  endpoint?: string;
+  saveLabel?: string;
+  revertLabel?: string;
+}) {
   const router = useRouter();
   const [title, setTitle] = useState(recipe.title);
   const [servings, setServings] = useState(recipe.yield?.qty?.toString() ?? "");
@@ -71,7 +87,7 @@ export function RecipeEditor({ recipe }: { recipe: Recipe }) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/recipes/${recipe.videoId}`, {
+      const res = await fetch(endpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(build()),
@@ -98,7 +114,7 @@ export function RecipeEditor({ recipe }: { recipe: Recipe }) {
 
   async function revert() {
     setState("saving");
-    await fetch(`/api/recipes/${recipe.videoId}`, { method: "DELETE" }).catch(() => null);
+    await fetch(endpoint, { method: "DELETE" }).catch(() => null);
     router.push(`/r/${recipe.videoId}`);
     router.refresh();
   }
@@ -254,7 +270,7 @@ export function RecipeEditor({ recipe }: { recipe: Recipe }) {
           disabled={state === "saving"}
           className="flex h-11 items-center rounded-md bg-accent px-[18px] text-[15px] font-semibold text-ground disabled:opacity-60"
         >
-          {state === "saving" ? "Saving…" : "Publish my version"}
+          {state === "saving" ? "Saving…" : saveLabel}
         </button>
         <button
           type="button"
@@ -262,7 +278,7 @@ export function RecipeEditor({ recipe }: { recipe: Recipe }) {
           disabled={state === "saving"}
           className="flex h-11 items-center rounded-md px-4 text-[15px] text-ink-soft"
         >
-          Revert to what Mise extracted
+          {revertLabel}
         </button>
       </div>
     </div>

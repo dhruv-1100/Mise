@@ -68,3 +68,33 @@ test.describe("recipe page", () => {
     expect(response?.status()).toBe(404);
   });
 });
+
+test.describe("personal edits, signed out", () => {
+  // The e2e stack runs with no DATABASE_URL and no auth configured, which is
+  // exactly the deployment BUILD_PLAN §6.1 requires to keep working: the whole
+  // public surface, with no signup wall. These assert the personal-edit surface
+  // added on top of it stays shut to anonymous readers rather than 500ing.
+
+  test("the edit page does not render for a signed-out reader", async ({ page }) => {
+    const response = await page.goto(`/r/${VIDEO_ID}/mine`);
+    // 404 when accounts are not configured at all, 307 to /signin when they are.
+    // Never 200, and never a stack trace.
+    expect([307, 404]).toContain(response?.status() ?? 0);
+  });
+
+  test("the API refuses an unauthenticated write", async ({ request }) => {
+    const response = await request.put(`/api/recipes/${VIDEO_ID}/mine`, {
+      data: { videoId: VIDEO_ID, title: "not mine to change" },
+    });
+    expect(response.status()).toBeGreaterThanOrEqual(400);
+    expect(response.status()).toBeLessThan(500);
+    // A typed envelope, never a raw exception (CLAUDE.md).
+    expect(await response.json()).toHaveProperty("error");
+  });
+
+  test("the API refuses an unauthenticated delete", async ({ request }) => {
+    const response = await request.delete(`/api/recipes/${VIDEO_ID}/mine`);
+    expect(response.status()).toBeGreaterThanOrEqual(400);
+    expect(response.status()).toBeLessThan(500);
+  });
+});
