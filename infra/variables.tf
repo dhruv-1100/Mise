@@ -213,9 +213,16 @@ variable "google_oauth_client_id" {
   // "Error 401: invalid_client" on a page that says nothing about why.
   //
   // Google's format is exact, so this is worth asserting rather than trusting.
+  // The suffix length is asserted, not just the shape. The first corrupted paste
+  // was obvious — newlines, a space, a pipe. The SECOND attempt looked entirely
+  // well-formed and was still wrong: reconstructing it by hand from the broken
+  // value dropped the character the pipe had replaced, leaving 31 of the 32
+  // characters Google issues. A shape-only check passed it, Vercel served it,
+  // and Google answered "The OAuth client was not found" — which reads like a
+  // deleted client rather than a typo.
   validation {
-    condition     = var.google_oauth_client_id == "" || can(regex("^[0-9]+-[a-z0-9]+\\.apps\\.googleusercontent\\.com$", var.google_oauth_client_id))
-    error_message = "google_oauth_client_id must look like 123456789-abc123.apps.googleusercontent.com — no spaces, no line breaks. Re-copy it from the GCP console; a wrapped paste corrupts it silently."
+    condition     = var.google_oauth_client_id == "" || can(regex("^[0-9]{6,}-[a-z0-9]{32}\\.apps\\.googleusercontent\\.com$", var.google_oauth_client_id))
+    error_message = "google_oauth_client_id must be <project-number>-<32 chars>.apps.googleusercontent.com. Use the copy button in the GCP console rather than selecting the text — a wrapped paste or a hand-retyped character produces something that looks right and does not exist."
   }
 }
 

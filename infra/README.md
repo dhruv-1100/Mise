@@ -253,6 +253,14 @@ needed. The `youtube.readonly` scope for claiming a channel is requested
 separately and only when someone claims (ADR 0003), and *that* is the one that
 needs Google verification past 100 users.
 
+**Use the console's copy button — do not select the text, and never retype it.**
+This went wrong twice here. The first paste wrapped and arrived with newlines, a
+space and a pipe in it. The second was reconstructed by hand from that broken
+value and dropped the character the pipe had replaced: 31 of the 32 characters
+Google issues, perfectly well-formed, and non-existent. Google answers "The
+OAuth client was not found", which reads like a deleted client rather than a
+typo. The variable now asserts the exact length.
+
 **Copy the client ID and secret carefully.** A value pasted across a wrapped
 terminal arrives with newlines and spaces inside it, Terraform stores it, Vercel
 serves it, and the only symptom is Google answering `Error 401: invalid_client`
