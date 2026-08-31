@@ -232,14 +232,21 @@ variable "google_oauth_client_secret" {
   default     = ""
   sensitive   = true
 
-  // The same paste corrupts this just as easily, and its failure is worse: a
-  // bad secret is accepted at the authorisation step and only rejected during
-  // the token exchange, so sign-in appears to work right up until the callback.
-  // No format is asserted beyond "no whitespace" — Google has changed the
-  // shape of these before and a stale pattern would reject a valid secret.
+  // Shape asserted, having predicted this failure and then declined to guard
+  // against it. The comment here used to say a loose check was safer because
+  // "Google has changed the shape of these before" — and the very next paste
+  // arrived 33 characters long with the GOCSPX- prefix missing, which a
+  // whitespace-only check waved through. Its failure mode is the worst of the
+  // three: authorisation succeeds, Google's consent screen appears, and the
+  // token exchange fails at the callback as "there is a problem with the server
+  // configuration", naming nothing.
+  //
+  // The tolerance argument was real but wrong here: a secret issued today is
+  // GOCSPX- plus 28 characters. If Google changes that, this line is the one to
+  // change, and a loud failure at apply beats a silent one at the callback.
   validation {
-    condition     = var.google_oauth_client_secret == "" || can(regex("^\\S+$", var.google_oauth_client_secret))
-    error_message = "google_oauth_client_secret contains whitespace or a line break. Re-copy it from the GCP console."
+    condition     = var.google_oauth_client_secret == "" || can(regex("^GOCSPX-[A-Za-z0-9_-]{28}$", var.google_oauth_client_secret))
+    error_message = "google_oauth_client_secret must be GOCSPX- followed by 28 characters. Use the copy button in the GCP console; selecting the text loses characters."
   }
 }
 
