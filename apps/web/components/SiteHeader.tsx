@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { auth, isAuthConfigured } from "@/auth";
 import { AccountMenu } from "@/components/AccountMenu";
+import { HeaderPasteField } from "@/components/HeaderPasteField";
 
 /**
  * The one piece of chrome shared by every page except cook mode.
@@ -28,6 +29,11 @@ export async function SiteHeader() {
         <Link href="/" className="font-display text-xl tracking-[-0.01em]">
           Mise
         </Link>
+
+        {/* Pushes the paste field and the account controls apart, so the field
+            sits in the middle of the bar rather than beside the wordmark. */}
+        <span className="flex-1" />
+        <HeaderPasteField />
 
         {/* No accounts configured is a valid deployment (BUILD_PLAN.md §6.1
             allows the whole public surface without them), so the header simply

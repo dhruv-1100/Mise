@@ -150,7 +150,7 @@ export default async function RecipePage({
   const jsonLd = toJsonLd(recipe, `${SITE}/r/${videoId}`);
 
   return (
-    <main className="mx-auto w-full max-w-[560px] flex-1 pb-16">
+    <main className="mx-auto w-full max-w-[1080px] flex-1 pb-16 lg:px-6">
       {/* Emitted from the same object the page renders, so the two cannot
           disagree. Structured data that contradicts the page is worse than
           none — it is what gets penalised. */}
@@ -159,82 +159,112 @@ export default async function RecipePage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Attribution is non-negotiable: creator name, channel link, and an
-          embedded player on every recipe page (CLAUDE.md). */}
-      <div className="aspect-video w-full bg-sunk">
-        <iframe
-          className="size-full"
-          src={`https://www.youtube-nocookie.com/embed/${recipe.videoId}`}
-          title={`${recipe.title} — ${recipe.creator.name}`}
-          allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture"
-          allowFullScreen
-        />
-      </div>
-
       <TrackRecipeView
         videoId={recipe.videoId}
         ingredientCount={recipe.ingredients.length}
         stepCount={recipe.steps.length}
       />
 
-      <div className="px-5">
-        <h1 className="mb-2.5 mt-5 font-display text-[34px] leading-[1.08] tracking-[-0.02em]">
-          {recipe.title}
-        </h1>
-        <p className="mb-5 text-sm">
-          <a
-            href={recipe.creator.channelUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            /* Italic display serif, the one place it is used. A creator's name
-               is a byline, not a label, and this is what distinguishes it from
-               every other piece of chrome on the page. */
-            className="font-display text-[20px] italic leading-none text-accent-deep underline-offset-2 hover:underline"
-          >
-            {recipe.creator.name}
-          </a>
-          <span className="text-ink-faint"> · on YouTube</span>
-        </p>
+      {/*
+        Three grid children, not two, and the order is doing real work.
 
-        <PersonalActions videoId={videoId} channelId={recipe.creator.channelId} />
+        At >=1024px the columns are minmax(0,1fr) and 380px, so the children
+        flow: header into column one, rail into column two, method back into
+        column one on the next row. The rail therefore sits beside the header
+        and the method runs underneath it — the 1b layout, with no `order`
+        rules and no extra nesting.
 
-        {extraction.personal === true && (
-          /* Without this the page silently lies: it shows numbers the creator
-             never wrote, with their name at the top, and nothing says why. */
-          <p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-accent-wash px-3.5 py-2.5 text-[13px] text-accent-deep">
-            <span className="font-semibold">You have edited this recipe.</span>
-            <Link href={`/r/${videoId}/mine`} className="font-semibold underline underline-offset-2">
-              Edit again
-            </Link>
-          </p>
-        )}
+        Below 1024 the grid is one column and the same three children stack as
+        header, rail, method. That is exactly the mobile order the spec asks
+        for: video, title, creator, stepper, advisories, ingredients, method.
+      */}
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-14 lg:pt-9">
+        <div>
+          {/* Attribution is non-negotiable: creator name, channel link, and an
+              embedded player on every recipe page (CLAUDE.md). */}
+          <div className="aspect-video w-full bg-sunk lg:overflow-hidden lg:rounded-lg">
+            <iframe
+              className="size-full"
+              src={`https://www.youtube-nocookie.com/embed/${recipe.videoId}`}
+              title={`${recipe.title} — ${recipe.creator.name}`}
+              allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
 
-        <ServingStepper recipe={recipe} />
+          <div className="px-5 lg:px-0">
+            <h1 className="mb-2.5 mt-5 font-display text-[34px] leading-[1.08] tracking-[-0.02em] lg:mt-6 lg:text-[46px] lg:leading-[1.05]">
+              {recipe.title}
+            </h1>
+            <p className="mb-5 text-sm">
+              <a
+                href={recipe.creator.channelUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                /* Italic display serif, the one place it is used. A creator's
+                   name is a byline, not a label, and this is what distinguishes
+                   it from every other piece of chrome on the page. */
+                className="font-display text-[20px] italic leading-none text-accent-deep underline-offset-2 hover:underline"
+              >
+                {recipe.creator.name}
+              </a>
+              <span className="text-ink-faint"> · on YouTube</span>
+            </p>
 
-        {recipe.steps.length > 0 ? (
-          <>
-            <h2 className="mb-1 mt-8 text-xs font-semibold uppercase tracking-[0.09em] text-ink-faint">
-              Method
-            </h2>
-            <ol className="mt-2">
-              {recipe.steps.map((step) => (
-                <li key={step.index} className="flex gap-4 border-b border-line py-3.5">
-                  <span className="flex size-8 flex-none items-center justify-center rounded-full bg-accent-wash text-sm font-bold tabular-nums text-accent-deep">
-                    {step.index}
-                  </span>
-                  <span className="pt-1 text-base leading-relaxed">{step.text}</span>
-                </li>
-              ))}
-            </ol>
-          </>
-        ) : (
-          /* The CookingShooking shape: ingredients in the description, method
-             only in the video. Saying so beats an empty heading. */
-          <p className="mt-8 rounded-lg bg-surface p-4 text-sm leading-relaxed text-ink-soft">
-            This creator lists ingredients but not steps. Watch the video above for the method.
-          </p>
-        )}
+            <PersonalActions videoId={videoId} channelId={recipe.creator.channelId} />
 
+            {extraction.personal === true && (
+              /* Without this the page silently lies: it shows numbers the
+                 creator never wrote, with their name at the top, and nothing
+                 says why. */
+              <p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-accent-wash px-3.5 py-2.5 text-[13px] text-accent-deep">
+                <span className="font-semibold">You have edited this recipe.</span>
+                <Link
+                  href={`/r/${videoId}/mine`}
+                  className="font-semibold underline underline-offset-2"
+                >
+                  Edit again
+                </Link>
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="px-5 lg:sticky lg:top-6 lg:rounded-lg lg:border lg:border-line lg:bg-surface lg:px-6 lg:py-5 lg:shadow-sm">
+          <ServingStepper recipe={recipe} />
+        </div>
+
+        <div className="px-5 lg:px-0">
+          {recipe.steps.length > 0 ? (
+            <>
+              <h2 className="mb-1 mt-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.09em] text-herb-text">
+                {/* --herb becomes the section-heading colour in 2a, which is
+                    why its lightness moved: 4.01:1 was a fill, 4.63:1 is a
+                    heading. */}
+                <span className="size-2 flex-none rounded-full bg-herb" aria-hidden="true" />
+                Method
+              </h2>
+              <ol className="mt-2">
+                {recipe.steps.map((step) => (
+                  <li key={step.index} className="flex gap-4 border-b border-line py-3.5">
+                    <span className="flex size-8 flex-none items-center justify-center rounded-full bg-accent-wash text-sm font-bold tabular-nums text-accent-deep">
+                      {step.index}
+                    </span>
+                    <span className="pt-1 text-base leading-relaxed lg:text-[17px]">
+                      {step.text}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          ) : (
+            /* The CookingShooking shape: ingredients in the description, method
+               only in the video. Saying so beats an empty heading. */
+            <p className="mt-2 rounded-lg bg-surface p-4 text-sm leading-relaxed text-ink-soft">
+              This creator lists ingredients but not steps. Watch the video above for the method.
+            </p>
+          )}
+        </div>
       </div>
     </main>
   );

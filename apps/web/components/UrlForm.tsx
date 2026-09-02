@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 
 import { track } from "@/lib/analytics/client";
 
@@ -15,8 +15,24 @@ const MESSAGES: Record<string, string> = {
   bad_request: "Paste a YouTube link to get started.",
 };
 
-export function UrlForm() {
+export function UrlForm({
+  /**
+   * The header's version: shorter, quieter, and no error text below it.
+   *
+   * Same component rather than a second one, because the thing that is hard
+   * about this form is the submit path — the error codes, the cached-video
+   * redirect, the busy state — and having two copies of that is how one of
+   * them drifts. Only the chrome differs.
+   */
+  compact = false,
+}: {
+  compact?: boolean;
+} = {}) {
   const router = useRouter();
+  // Unique per instance. The header and the home hero are the same component,
+  // and a hardcoded id would collide the moment both render — silently breaking
+  // the label association rather than erroring.
+  const fieldId = useId();
   const [video, setVideo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,13 +82,17 @@ export function UrlForm() {
     <div>
       <form
         onSubmit={onSubmit}
-        className="flex items-center gap-2.5 rounded-lg border border-line bg-surface py-1.5 pl-4 pr-1.5 shadow-sm"
+        className={
+          compact
+            ? "flex h-10 items-center gap-2 rounded-md border border-line bg-ground px-3"
+            : "flex items-center gap-2.5 rounded-lg border border-line bg-surface py-1.5 pl-4 pr-1.5 shadow-sm"
+        }
       >
-        <label htmlFor="video" className="sr-only">
+        <label htmlFor={fieldId} className="sr-only">
           YouTube video URL
         </label>
         <input
-          id="video"
+          id={fieldId}
           name="video"
           type="url"
           inputMode="url"
@@ -81,14 +101,20 @@ export function UrlForm() {
           value={video}
           onChange={(e) => setVideo(e.target.value)}
           aria-invalid={error !== null}
-          aria-describedby={error === null ? undefined : "video-error"}
-          className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-ink-faint"
+          aria-describedby={error === null ? undefined : `${fieldId}-error`}
+          className={`min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-faint ${
+            compact ? "text-sm" : "text-base"
+          }`}
         />
         <button
           type="submit"
           disabled={busy}
           /* 44px minimum target — the design's rule, not a suggestion. */
-          className="flex h-11 min-w-11 items-center gap-2 rounded-md bg-accent px-[18px] text-[15px] font-semibold text-ground disabled:opacity-60"
+          className={
+            compact
+              ? "flex h-8 items-center rounded-[5px] bg-accent px-3 text-[13px] font-semibold text-ground disabled:opacity-60"
+              : "flex h-11 min-w-11 items-center gap-2 rounded-md bg-accent px-[18px] text-[15px] font-semibold text-ground disabled:opacity-60"
+          }
         >
           {busy ? "Working…" : "Extract"}
         </button>
@@ -97,7 +123,7 @@ export function UrlForm() {
       {error !== null && (
         /* assertive: the person just acted and is waiting on the answer. */
         <p
-          id="video-error"
+          id={`${fieldId}-error`}
           role="alert"
           aria-live="assertive"
           className="mt-3 text-sm leading-relaxed text-warn-text"
