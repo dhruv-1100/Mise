@@ -186,7 +186,10 @@ export default async function RecipePage({
             href={recipe.creator.channelUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-accent-deep underline-offset-2 hover:underline"
+            /* Italic display serif, the one place it is used. A creator's name
+               is a byline, not a label, and this is what distinguishes it from
+               every other piece of chrome on the page. */
+            className="font-display text-[20px] italic leading-none text-accent-deep underline-offset-2 hover:underline"
           >
             {recipe.creator.name}
           </a>

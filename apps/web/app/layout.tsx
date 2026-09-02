@@ -11,6 +11,10 @@ import "./globals.css";
 const display = Instrument_Serif({
   subsets: ["latin"],
   weight: "400",
+  // Both axes. The italic is used for exactly one thing — a creator's name —
+  // which is the only place on a recipe page that is a person rather than a
+  // label, and the one line that should read as a byline rather than as UI.
+  style: ["normal", "italic"],
   variable: "--font-display-loaded",
   display: "swap",
 });

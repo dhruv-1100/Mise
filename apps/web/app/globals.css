@@ -10,33 +10,38 @@
 
 :root {
   /* Surfaces, warm rather than neutral grey */
-  --ground: oklch(0.982 0.008 78);
-  --surface: oklch(0.962 0.012 76);
-  --sunk: oklch(0.930 0.016 74);
-  --line: oklch(0.876 0.018 72);
+  --ground: oklch(0.975 0.014 80);
+  --surface: oklch(0.958 0.020 78);
+  --sunk: oklch(0.925 0.024 76);
+  --line: oklch(0.870 0.022 74);
 
   /* Ink */
   --ink: oklch(0.235 0.018 55);
   --ink-soft: oklch(0.478 0.020 60);
   --ink-faint: oklch(0.628 0.018 65); /* 3.4:1 — 12px bold and up only */
 
-  /* Accent and semantics. These three share lightness 0.565 and chroma 0.168
-     and differ only in hue, so meaning is carried by hue and no one of them
-     shouts louder than the others. */
-  --accent: oklch(0.565 0.168 42);
-  --accent-deep: oklch(0.455 0.150 40);
-  --accent-wash: oklch(0.945 0.032 48);
-  --herb: oklch(0.565 0.168 148);
+  /* Accent and semantics.
+     The three used to share lightness 0.565 and chroma 0.168, differing only in
+     hue, so no one of them shouted louder than the others. The 2a pass broke
+     that deliberately: --herb is now a section-heading colour rather than a
+     status fill, and a heading has to be readable as small text. Dropping its
+     lightness to 0.520 takes it from 4.01:1 on --ground to 4.63:1, over the
+     4.5 that small text requires. --warn keeps the original value, because
+     advisories are the one place the matched trio was already right. */
+  --accent: oklch(0.545 0.200 38);
+  --accent-deep: oklch(0.455 0.170 36);
+  --accent-wash: oklch(0.940 0.040 46);
+  --herb: oklch(0.520 0.170 150);
   --herb-wash: oklch(0.948 0.030 150);
   --warn: oklch(0.565 0.168 82);
   --warn-wash: oklch(0.952 0.040 86);
 
   /* Text tier for the semantic colours.
-     Matched oklch lightness makes them perceptually even, but WCAG luminance
-     is NOT perceptual lightness: herb and warn measure 4.0:1 and 4.4:1 on
-     ground, under the 4.5 small text requires. The matched trio above stays
-     for fills and icons, where 3:1 applies; these carry text. */
-  --herb-text: oklch(0.500 0.168 148);
+     Matched oklch lightness makes them perceptually even, but WCAG luminance is
+     NOT perceptual lightness. --warn still needs this tier for text; --herb no
+     longer does, since 2a moved the base value itself over 4.5 — the tier is
+     kept for it anyway so the two semantics stay symmetrical in use. */
+  --herb-text: oklch(0.470 0.160 150);
   --warn-text: oklch(0.495 0.168 82);
 
   /* Cook mode. Inverted for glare, and the constraint that set the type scale:

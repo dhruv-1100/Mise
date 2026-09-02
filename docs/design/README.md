@@ -41,21 +41,30 @@ But **WCAG relative luminance is not perceptual lightness**: at that shared
 lightness, herb measured 4.01:1 and warn 4.37:1 against ground, both under the
 4.5:1 small text requires. They were being used for 11–12px bold labels.
 
+**Re-measured after the 2a chroma pass.** That pass was specified as "lightness
+and hue unchanged, only chroma moves", which would have left every ratio here
+intact. It is not what the values do — lightness or hue moves on all nine, and
+herb's lightness moves by 0.045 — so the table was recomputed rather than
+trusted. Nothing regressed and two things improved: `ground on accent` 4.7 to
+5.0, and `herb on ground` 4.01 to 4.63, which is what lets herb become a
+section-heading colour instead of a fill. Under the old value that promotion
+would have shipped a heading at 4.01:1.
+
 Rather than abandon the principle, the matched trio stays for fills and icons —
 where the 3:1 non-text threshold applies and perceptual evenness is what
 matters — and a text tier was added:
 
 | Pair | Ratio | Needs | Used for |
 | --- | --- | --- | --- |
-| ink on ground | 15.9:1 | 4.5 | body text |
-| ink-soft on ground | 6.3:1 | 4.5 | secondary text |
-| ink-faint on ground | 3.4:1 | 3.0 | meta, 12px bold and up only |
-| accent-deep on ground | 7.4:1 | 4.5 | links |
-| ground on accent | 4.7:1 | 4.5 | primary button label |
+| ink on ground | 15.6:1 | 4.5 | body text |
+| ink-soft on ground | 6.2:1 | 4.5 | secondary text |
+| ink-faint on ground | 3.3:1 | 3.0 | meta, 12px bold and up only |
+| accent-deep on ground | 7.3:1 | 4.5 | links |
+| ground on accent | 5.0:1 | 4.5 | primary button label |
 | warn-text on warn-wash | 5.4:1 | 4.5 | advisory text |
-| herb-text on ground | 5.2:1 | 4.5 | creator-corrected badge |
-| warn on ground | 4.4:1 | 3.0 | icons and fills only |
-| herb on ground | 4.0:1 | 3.0 | icons and fills only |
+| herb-text on ground | 5.7:1 | 4.5 | creator-corrected badge |
+| warn on ground | 4.3:1 | 3.0 | icons and fills only |
+| herb on ground | 4.6:1 | 4.5 | section headings and fills |
 | cook-ink on cook-ground | 16.9:1 | 4.5 | cook mode step text |
 | cook-ink-soft on cook-ground | 8.7:1 | 4.5 | cook mode secondary |
 
