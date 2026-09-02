@@ -235,14 +235,6 @@ export default async function RecipePage({
           </p>
         )}
 
-        {recipe.steps.length > 0 && (
-          <Link
-            href={`/r/${videoId}/cook`}
-            className="mt-7 flex min-h-11 items-center justify-center gap-2.5 rounded-md bg-accent px-4 py-3.5 text-base font-semibold text-ground"
-          >
-            Start cooking
-          </Link>
-        )}
       </div>
     </main>
   );

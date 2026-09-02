@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { isMetric, scale, toMetric, type ScaledIngredient } from "@mise/scaling";
 import type { Recipe } from "@mise/schema";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -188,6 +190,20 @@ export function ServingStepper({ recipe }: { recipe: Recipe }) {
       )}
 
       <IngredientList items={value.ingredients} metric={metric} />
+
+      {recipe.steps.length > 0 && (
+        /* The link lives here rather than on the page because it has to carry
+           the serving count, and this component is where that count lives.
+           Cook mode is a separate route, so a query parameter is the only way
+           across — and it survives a reload and a shared link, which lifting
+           the state into a context would not. */
+        <Link
+          href={`/r/${recipe.videoId}/cook?servings=${servings}`}
+          className="mt-7 flex min-h-11 items-center justify-center gap-2.5 rounded-md bg-accent px-4 py-3.5 text-base font-semibold text-ground"
+        >
+          Start cooking
+        </Link>
+      )}
     </>
   );
 }

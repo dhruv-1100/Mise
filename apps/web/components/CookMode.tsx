@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import type { Recipe } from "@mise/schema";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { track } from "@/lib/analytics/client";
 import { describeDuration, formatCountdown, formatDuration } from "@/lib/timer";
+import { StepIngredients } from "@/components/StepIngredients";
+import { scale } from "@mise/scaling";
 import { useTimers } from "@/components/useTimers";
 
 /**
@@ -17,7 +19,23 @@ import { useTimers } from "@/components/useTimers";
  * a counter, by someone with wet hands. 28px step text, an 18px floor, 44px
  * targets, inverted for glare.
  */
-export function CookMode({ recipe, signedIn }: { recipe: Recipe; signedIn: boolean }) {
+export function CookMode({
+  recipe,
+  signedIn,
+  /**
+   * The serving count chosen on the recipe page, carried in the URL.
+   *
+   * Cook mode is a separate route, so the stepper's state cannot reach it any
+   * other way. A cook who scaled to 12 and then pressed Start cooking must not
+   * be shown the 4-serving numbers, and a query parameter makes that survive a
+   * reload and a shared link, which component state would not.
+   */
+  servings,
+}: {
+  recipe: Recipe;
+  signedIn: boolean;
+  servings: number | null;
+}) {
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const [finishing, setFinishing] = useState(false);
@@ -26,6 +44,16 @@ export function CookMode({ recipe, signedIn }: { recipe: Recipe; signedIn: boole
 
   const wakeLock = useWakeLock();
   const timers = useTimers();
+
+  // The same engine the recipe page runs, on the same numbers — including the
+  // sublinear seasoning rule. Anything else would put two different answers in
+  // front of one cook.
+  const scaled = useMemo(() => {
+    const target = servings ?? recipe.yield?.qty ?? null;
+    if (target === null) return null;
+    const result = scale(recipe, target);
+    return result.ok ? result.value : null;
+  }, [recipe, servings]);
 
   const openedAt = useRef(Date.now());
   const deepest = useRef(0);
@@ -125,6 +153,20 @@ export function CookMode({ recipe, signedIn }: { recipe: Recipe; signedIn: boole
           chrome around it on every tap would be noise. */}
       <div className="flex-1 px-6 pt-9" aria-live="polite">
         <p className="m-0 text-[28px] font-medium leading-[1.35]">{step.text}</p>
+
+        {/* Below the step, above the timers — the spec's ordering, and the
+            right one: the instruction is what you came back to read, the
+            quantities are what you check against it, and a timer you started
+            two minutes ago should not push either of them down. */}
+        <StepIngredients
+          items={scaled?.ingredients ?? []}
+          all={scaled?.ingredients ?? []}
+          servings={servings ?? recipe.yield?.qty ?? null}
+          /* `step.uses` does not exist in the schema yet, so every step gets
+             the full list. The spec explicitly permits this fallback and says
+             not to block on it. */
+          precise={false}
+        />
 
         {(step.durationS !== null || step.tempC !== null) && (
           <div className="mt-6 flex flex-wrap gap-3">

@@ -6,8 +6,10 @@ import { loadRecipe } from "@/lib/recipe";
 
 export default async function CookPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ videoId: string }>;
+  searchParams: Promise<{ servings?: string }>;
 }) {
   const { videoId } = await params;
   const recipe = await loadRecipe(videoId);
@@ -17,5 +19,14 @@ export default async function CookPage({
   // that the cook happened. No wall, per BUILD_PLAN.md §6.1.
   const signedIn = isAuthConfigured && (await auth())?.user !== undefined;
 
-  return <CookMode recipe={recipe} signedIn={signedIn} />;
+  // The serving count travels from the recipe page in the URL, because cook
+  // mode is a separate route and the stepper's state cannot reach it otherwise.
+  // Parsed defensively: this is a query parameter, so it is whatever anyone
+  // types, and a bad value must fall back to the recipe's own yield rather than
+  // scale by NaN.
+  const raw = Number((await searchParams).servings);
+  const servings =
+    Number.isFinite(raw) && raw > 0 && raw <= 100 ? Math.floor(raw) : null;
+
+  return <CookMode recipe={recipe} signedIn={signedIn} servings={servings} />;
 }
