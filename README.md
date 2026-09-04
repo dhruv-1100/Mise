@@ -7,8 +7,10 @@ from.
 URL, watch the extraction run, get a recipe you can scale, convert to metric,
 and cook from with timers.
 
-> **Status.** Phases 0–6 are built and deployed. Phases 7–12 (observability,
-> load testing, launch, recommender, A/B) are not started. Two things are
+> **Status.** Phases 0–6 are built, deployed, and exercised end to end against
+> production — including sign-in, saving, and per-user recipe edits. Phases 7–12
+> (observability, load testing, launch, recommender, A/B) are not started. Two
+> things are
 > knowingly outstanding and are called out under [What does not
 > work](#what-does-not-work) rather than buried: the accuracy eval set is
 > unlabelled, so **there is no accuracy number**, and Lighthouse has never been
@@ -32,12 +34,19 @@ and cook from with timers.
 - **When the description has no recipe, it watches the video.** Roughly one
   description in five carries nothing usable. Gemini reads the video itself as a
   fallback — see [ADR 0006](docs/adr/0006-video-fallback.md).
-- **Cook mode.** Step-by-step, screen kept awake, inline timers that survive a
-  locked phone because they count from a wall-clock timestamp rather than
-  ticking down.
+- **Cook mode.** Step-by-step, screen kept awake, and each step carries the
+  ingredients it needs at the serving count you chose — so nobody has to leave
+  the step, find the quantity, and come back with wet hands. Inline timers
+  survive a locked phone, because they count from a wall-clock timestamp rather
+  than ticking down.
 - **Accounts.** Google OAuth2, JWT sessions over database users, RBAC. Save
   recipes, keep notes, count cooks. Verified creators can correct extractions of
   their own videos; anyone can keep their own edited version of any recipe.
+- **Built to a design, not improvised.** The palette is oklch with every
+  foreground/background pair's contrast computed rather than eyeballed
+  ([`docs/design/README.md`](docs/design/README.md) carries the table). The
+  recipe page is a two-column layout with a sticky ingredient rail above
+  1024px and a single column below.
 
 ## Architecture
 
@@ -51,6 +60,7 @@ packages/schema   the recipe contract (zod), mirrored in Pydantic, plus the
                   protobuf service definition
 infra             Terraform: Neon, Upstash, Vercel, Grafana, Cloud Run
 docs/adr          six architecture decision records
+docs/design       the design system and its measured contrast table
 ```
 
 The web app never calls an LLM. The extractor never renders anything. The
