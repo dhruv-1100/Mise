@@ -58,7 +58,7 @@ matters — and a text tier was added:
 | --- | --- | --- | --- |
 | ink on ground | 15.6:1 | 4.5 | body text |
 | ink-soft on ground | 6.2:1 | 4.5 | secondary text |
-| ink-faint on ground | 3.3:1 | 3.0 | meta, 12px bold and up only |
+| ink-faint on ground | 4.6:1 | 4.5 | meta and secondary labels |
 | accent-deep on ground | 7.3:1 | 4.5 | links |
 | ground on accent | 5.0:1 | 4.5 | primary button label |
 | warn-text on warn-wash | 5.4:1 | 4.5 | advisory text |

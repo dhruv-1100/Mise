@@ -18,7 +18,14 @@
   /* Ink */
   --ink: oklch(0.235 0.018 55);
   --ink-soft: oklch(0.478 0.020 60);
-  --ink-faint: oklch(0.628 0.018 65); /* 3.4:1 — 12px bold and up only */
+  /* 4.6:1 on --ground. Was 0.628, which measured 3.3:1 and carried the comment
+     "12px bold and up only" — a misreading of WCAG's large-text threshold,
+     which is 24px, or 18.66px bold. 12px bold is not large text, so the old
+     value failed AA for every text use it had, not just the small ones.
+     Lighthouse found it on the home page at 13px normal; nine call sites shared
+     the fault. Darkening the token fixes all of them and makes the tier's own
+     documented rule true instead of aspirational. */
+  --ink-faint: oklch(0.545 0.018 65);
 
   /* Accent and semantics.
      The three used to share lightness 0.565 and chroma 0.168, differing only in
