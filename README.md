@@ -13,8 +13,7 @@ and cook from with timers.
 > things are
 > knowingly outstanding and are called out under [What does not
 > work](#what-does-not-work) rather than buried: the accuracy eval set is
-> unlabelled, so **there is no accuracy number**, and Lighthouse has never been
-> run. See [`BUILD_PLAN.md`](BUILD_PLAN.md) for all 12 phases and
+> unlabelled, so **there is no accuracy number**. See [`BUILD_PLAN.md`](BUILD_PLAN.md) for all 12 phases and
 > [`CLAUDE.md`](CLAUDE.md) for the conventions that govern the code.
 
 ## What it does
@@ -42,8 +41,10 @@ and cook from with timers.
 - **Accounts.** Google OAuth2, JWT sessions over database users, RBAC. Save
   recipes, keep notes, count cooks. Verified creators can correct extractions of
   their own videos; anyone can keep their own edited version of any recipe.
-- **Built to a design, not improvised.** The palette is oklch with every
-  foreground/background pair's contrast computed rather than eyeballed
+- **Built to a design, not improvised.** Lighthouse scores 100 on performance
+  and accessibility across the home, recipe and cook-mode routes. The palette is
+  oklch with every foreground/background pair's contrast computed rather than
+  eyeballed
   ([`docs/design/README.md`](docs/design/README.md) carries the table). The
   recipe page is a two-column layout with a sticky ingredient rail above
   1024px and a single column below.
@@ -116,8 +117,6 @@ Stated plainly, because a README that only lists what works is marketing.
   is scaffolded but unlabelled, so precision, recall and quantity accuracy are
   all unmeasured. Phase 2's exit gate cannot be evaluated. See
   [`docs/LABELLING.md`](docs/LABELLING.md).
-- **Lighthouse has never been run**, so the ≥95 performance and accessibility
-  target in Phase 6 is unverified.
 - **Extraction is slower than the design assumed.** Measured in production:
   12–90s for the description path, and about 28s more when it falls back to
   watching the video. The 60s target in [`docs/METRICS.md`](docs/METRICS.md) is

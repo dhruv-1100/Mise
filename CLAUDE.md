@@ -7,9 +7,9 @@ A web app that converts cooking videos into structured, scalable recipes.
 **Status:** Phases 0, 2.1, 3, 4, 5 complete. Phase 6 is built — paste a URL,
 watch live stages, get a scalable recipe with cook mode; sign in with Google to
 save, note and count cooks; verified creators can correct extractions of their
-own videos; seven product events firing with retention cohorts defined. Two of
-its exit criteria remain open: **Lighthouse has never been run**, and nothing
-is live until `deploy.yml` runs once.
+own videos; seven product events firing with retention cohorts defined. Its exit criteria are met: both halves are
+deployed, and Lighthouse scores 100 on performance and accessibility across the
+home, recipe and cook routes (`docs/METRICS.md`).
 Phase 2.3 works from a real YouTube URL: fetch -> normalize -> extract -> units,
 exposed as `POST /extract`. Entity
 resolution and the sanity-rule validator are still open, and there is no

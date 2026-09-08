@@ -61,6 +61,29 @@ The decomposition that matters and still does not exist: cold start vs. YouTube
 fetch vs. Gemini call. One description stage took 149.8s on its own, which no
 current instrumentation explains.
 
+### Lighthouse — first run, 2026-09-08
+
+Against the deployed site, desktop preset, three representative routes.
+Phase 6's exit criterion is **>=95 on performance and accessibility**.
+
+| Route | Performance | Accessibility | Best practices | SEO |
+| --- | --- | --- | --- | --- |
+| `/` | 100 | 100 | 100 | 100 |
+| `/r/[videoId]` | 100 | 100 | 96 | 100 |
+| `/r/[videoId]/cook` | 100 | 100 | 100 | 100 |
+
+**Criterion met on every route.** LCP 0.4s on the home and cook routes, 1.1s on
+the recipe page; CLS 0 everywhere.
+
+The recipe page's 96 on best practices is the YouTube embed setting a cookie.
+It is `youtube-nocookie.com` already, the embed is required by the attribution
+rule in CLAUDE.md, and the deduction is not part of the gate — so it stays.
+
+The run was not a formality: it found `--ink-faint` failing WCAG AA at two
+different values before passing, and the second failure was on `--surface`, a
+background the contrast table had never covered. See
+`docs/design/README.md`.
+
 ## Product
 
 Instrumented in Phase 6.3. Cohort definitions are fixed in
