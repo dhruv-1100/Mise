@@ -32,6 +32,13 @@ spices grow by `factor^0.7176`, potatoes round to whole units and say so, and
 
 ## Accessibility (§5.5)
 
+**Every pair here is against two backgrounds now, not one.** The table used to
+list only `on ground`, which was complete until the 1b layout put the ingredient
+rail on `--surface` — a darker background that quietly invalidated a column
+nobody had computed. `--ink-faint` passed on ground at 4.62:1 and failed on
+surface at 4.40:1, and only a Lighthouse run on the deployed recipe page caught
+it. Add a background, add a column.
+
 Contrast was computed from the oklch values, not eyeballed, and the audit found
 a real problem worth recording.
 
@@ -58,7 +65,10 @@ matters — and a text tier was added:
 | --- | --- | --- | --- |
 | ink on ground | 15.6:1 | 4.5 | body text |
 | ink-soft on ground | 6.2:1 | 4.5 | secondary text |
-| ink-faint on ground | 4.6:1 | 4.5 | meta and secondary labels |
+| ink-faint on ground | 4.9:1 | 4.5 | meta and secondary labels |
+| ink-faint on **surface** | 4.7:1 | 4.5 | the same, inside the recipe rail |
+| ink-soft on **surface** | 5.9:1 | 4.5 | secondary text in the rail |
+| accent-deep on **surface** | 7.0:1 | 4.5 | links in the rail |
 | accent-deep on ground | 7.3:1 | 4.5 | links |
 | ground on accent | 5.0:1 | 4.5 | primary button label |
 | warn-text on warn-wash | 5.4:1 | 4.5 | advisory text |

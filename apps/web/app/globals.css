@@ -24,8 +24,15 @@
      value failed AA for every text use it had, not just the small ones.
      Lighthouse found it on the home page at 13px normal; nine call sites shared
      the fault. Darkening the token fixes all of them and makes the tier's own
-     documented rule true instead of aspirational. */
-  --ink-faint: oklch(0.545 0.018 65);
+     documented rule true instead of aspirational.
+
+     Darkened TWICE. The first pass used 0.545, which passes on --ground at
+     4.62:1 and fails on --surface at 4.40:1 — and the 1b desktop rail put this
+     text on --surface for the first time. Contrast had only ever been computed
+     against --ground, so a new background silently invalidated a whole column
+     of the table nobody had. 0.530 clears both: 4.93:1 on ground, 4.68:1 on
+     surface. */
+  --ink-faint: oklch(0.530 0.018 65);
 
   /* Accent and semantics.
      The three used to share lightness 0.565 and chroma 0.168, differing only in
