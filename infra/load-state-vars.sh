@@ -56,6 +56,19 @@ else
   export TF_VAR_youtube_api_key="$(_mise_run YOUTUBE_API_KEY)"
   export TF_VAR_gemini_api_key="$(_mise_run GEMINI_API_KEY)"
   export TF_VAR_neon_org_id="$(jq -r '.resources[]|select(.type=="neon_project")|.instances[].attributes.org_id // empty' "$_mise_state" 2>/dev/null)"
+
+  # The SNS subscription endpoint, once one exists. Added after the recovery
+  # apply created the alarm and the topic but not the subscription: the shell
+  # holding TF_VAR_alert_email had been lost, and `count = var.alert_email == ""
+  # ? 0 : 1` resolved to zero without complaint. The alarm was wired to a topic
+  # nobody was listening to, which looks configured in every view except the
+  # subscription list.
+  #
+  # Exported only when found. Exporting an empty one would be the very trap
+  # this file exists to close — an empty value here destroys the subscription
+  # on the next apply, exactly as it does for the Vercel variables above.
+  _mise_alert="$(jq -r '.resources[]|select(.type=="aws_sns_topic_subscription")|.instances[].attributes.endpoint // empty' "$_mise_state" 2>/dev/null)"
+  if [ -n "$_mise_alert" ]; then export TF_VAR_alert_email="$_mise_alert"; fi
   export TF_VAR_gcp_project_id="$(jq -r '.resources[]|select(.type=="google_cloud_run_v2_service")|.instances[].attributes.project // empty' "$_mise_state" 2>/dev/null)"
 
   # Shape only. A length is not a secret, and it catches an empty extraction —
@@ -70,8 +83,13 @@ else
   printf '  %-36s %d chars\n' TF_VAR_gemini_api_key              "${#TF_VAR_gemini_api_key}"
   printf '  %-36s %d chars\n' TF_VAR_neon_org_id                 "${#TF_VAR_neon_org_id}"
   printf '  %-36s %d chars\n' TF_VAR_gcp_project_id              "${#TF_VAR_gcp_project_id}"
+  if [ -n "$_mise_alert" ]; then
+    printf '  %-36s %d chars\n' TF_VAR_alert_email               "${#_mise_alert}"
+  else
+    echo "  TF_VAR_alert_email                   no subscription in state — export it to create one"
+  fi
   echo "  (0 chars anywhere above means the apply would DESTROY that variable)"
 
   unset -f _mise_vercel _mise_run
 fi
-unset _d _mise_state
+unset _d _mise_state _mise_alert
