@@ -1,0 +1,96 @@
+name: Canary
+
+# Two jobs in one: an uptime check, and the traffic that keeps the database
+# alive.
+#
+# On 2026-10-20 the extractor was hard-down and nobody knew. Upstash deletes a
+# free-tier Redis database after fourteen days without traffic, and Mise is a
+# portfolio project that routinely goes a fortnight between visits. The database
+# was archived, the endpoint stopped resolving, and every queue-backed call
+# failed. It surfaced only because a human opened the site — Health kept
+# returning `ok` the whole time, correctly, since it is liveness-only by design.
+#
+# One real RPC a day is enough to reset that fourteen-day clock, and it fails
+# loudly the day anything else breaks. See docs/INCIDENTS.md.
+#
+# NOT ABSOLUTE PROTECTION. GitHub disables scheduled workflows in a repository
+# with no pushes for sixty days, so a long enough gap in commits takes the
+# canary down with it and the clock starts again. Re-enabling is one click in
+# the Actions tab, but it is worth knowing rather than discovering.
+
+on:
+  schedule:
+    # Daily. The window to defend is fourteen days, so this spends ~30 minutes
+    # of Actions time a month to get fourteen independent chances to notice.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+# A canary that piles up behind itself reports queueing, not availability.
+concurrency:
+  group: canary
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # Workload Identity Federation, exactly as in deploy.yml: the address is
+  # resolved from Cloud Run rather than stored, so a redeployed service cannot
+  # leave this probing somewhere stale. No key is stored anywhere.
+  id-token: write
+
+jobs:
+  probe:
+    name: probe production
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - id: auth
+        uses: google-github-actions/auth@v3.0.0
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+
+      - name: Resolve the service address
+        id: address
+        run: |
+          URL=$(gcloud run services describe "${{ vars.EXTRACTOR_SERVICE }}" \
+            --region "${{ vars.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --format 'value(status.url)')
+          echo "address=${URL#https://}:443" >> "$GITHUB_OUTPUT"
+
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: apps/extractor/uv.lock
+
+      # The same script the deploy gate runs. Its GetStatus call reads Redis
+      # without a guard, which is the point: GetRecipe alone would answer
+      # `found: false` against a database that no longer exists, because the
+      # read path now falls through to the S3 archive on purpose.
+      - name: Probe
+        working-directory: apps/extractor
+        run: |
+          uv sync --frozen
+          uv run --frozen python scripts/smoke_grpc.py "${{ steps.address.outputs.address }}"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Canary — ${{ job.status }}"
+            echo
+            echo "Probed \`${{ steps.address.outputs.address }}\` at $(date -u '+%Y-%m-%d %H:%M UTC')."
+            echo
+            if [ "${{ job.status }}" != "success" ]; then
+              echo "A failure here is production, not CI. Check in this order:"
+              echo
+              echo "1. Upstash console — a free database is deleted after 14 days idle."
+              echo "2. \`gcloud run services describe ${{ vars.EXTRACTOR_SERVICE }}\` for a bad revision."
+              echo "3. Roll back: \`gcloud run services update-traffic ${{ vars.EXTRACTOR_SERVICE }} --to-revisions=PREVIOUS=100\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
