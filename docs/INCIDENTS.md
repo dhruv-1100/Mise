@@ -192,3 +192,76 @@ server backed by a failing Redis — exit 1 — and a working one — exit 0.
   disables the thing protecting against long gaps.
 - Nothing watches Neon, Vercel or the free tiers' equivalent policies. The same
   class of failure is available from three other providers.
+
+---
+
+## 2026-10-20 — the recipe archive had never worked, and nothing could tell
+
+**Impact:** No durable copy of any recipe existed between the archive shipping
+(2026-10-19) and this fix. The S3 bucket was empty from creation. Every 404 that
+ADR 0007 was written to prevent was still fully possible the whole time, and the
+Redis deletion earlier the same day would have destroyed every extracted recipe
+with no recovery — which is precisely the scenario the archive was built for.
+
+The dead-letter alarm was equally inert: `metrics.py` could not publish, so
+`DeadLetterDepth` reached CloudWatch zero times and the alarm sat in
+`INSUFFICIENT_DATA` with `treat_missing_data = "notBreaching"`.
+
+**Detected by:** Running `scripts/verify_aws.py` for the first time, during
+recovery from the Redis outage above. The script was written alongside the
+archive specifically to catch this class of problem and had never been run —
+the second time in this repository that verification was written down and not
+performed (see 2026-08-28), and the first time it would have caught something.
+
+**Root cause:** The IAM trust policy pinned the wrong condition key. For the
+built-in `accounts.google.com` provider, AWS maps:
+
+```
+accounts.google.com:oaud  -> the token's `aud` claim, always
+accounts.google.com:aud   -> the token's `azp` claim when present,
+                             falling back to `aud`
+```
+
+Google service account identity tokens carry `azp`, set to the account's numeric
+unique id. The policy required `accounts.google.com:aud` to equal
+`mise-extractor-aws`, so AWS was comparing `116924920265042331650` against that
+string. It could never match.
+
+The error AWS returns for this is `AccessDenied: Not authorized to perform
+sts:AssumeRoleWithWebIdentity` — naming no claim, no condition and no value, so
+it reads like a missing IAM permission rather than a failed string comparison.
+Several hours went into permissions that were already correct.
+
+**Fix:** `accounts.google.com:oaud`, which maps to `aud` unconditionally and is
+therefore right whether or not `azp` is present. Confirmed in production: the
+role is assumed, `DeadLetterDepth` is publishing, the alarm moved to `OK`, and
+`recipes/r4saZD0J_gU.json` is in the bucket.
+
+**Prevention:** This is the uncomfortable one, because the honest answer is
+*not much yet*.
+
+`archive.put` is best-effort and swallows its own errors — deliberately, and
+still correctly: a durable copy failing to land must not fail an extraction that
+already succeeded. But that design made a completely non-functional subsystem
+indistinguishable from a working one at every level except a `WARNING` in logs
+nobody reads. Correct error handling and zero observability compose into
+something worse than either.
+
+What exists now is partial. The daily canary guarantees the service runs at
+least once every 24 hours, and a running service publishes `DeadLetterDepth`
+within 60 seconds. That makes *absence* of the metric meaningful for the first
+time — before the canary, missing data genuinely meant "scaled to zero".
+
+**Open:**
+
+- **A federation failure is still silent.** `treat_missing_data = "notBreaching"`
+  is right for the DLQ alarm but means a publisher that cannot authenticate
+  triggers nothing. The fix is a second alarm on `DeadLetterDepth` having no
+  datapoints in 24h, which is only sound because the canary now guarantees
+  daily traffic. Worth doing before Phase 7.
+- **Nothing counts archive write failures.** A Prometheus counter on
+  `archive.put` failures, due in Phase 7 anyway, would have made this visible
+  on day one.
+- **The read fallthrough has never been exercised against real S3.** It is
+  covered by tests using a fake archive, and the real path has now been proven
+  for writes only.

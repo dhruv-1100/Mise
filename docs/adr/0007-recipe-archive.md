@@ -131,10 +131,21 @@ out to matter enormously.
 
 `cached_recipe` read Redis unguarded before falling through, so an unreachable
 database raised `ConnectionError` out of the servicer and the archive was never
-consulted. Every recipe that this tier existed to protect was sitting durably in
-S3 and was unreachable for the whole outage. The durable tier was present,
-correct, and bypassed — which is worse than not having built it, because it
-bought a confidence it did not deliver.
+consulted.
+
+**Correction, written later the same day.** The paragraph that stood here said
+the recipes were "sitting durably in S3" and called the tier "present, correct,
+and bypassed". None of that was true. The bucket was empty. The federation
+described below under *Federation, not keys* had never once succeeded, and the
+archive had written nothing since the day it shipped — see the second
+2026-10-20 entry in `docs/INCIDENTS.md`. The tier was present, misconfigured,
+and silent.
+
+That correction is left visible rather than edited away, because the mistake is
+instructive: the addendum above was written from the code and the design, both
+of which were sound, without checking the bucket. `scripts/verify_aws.py` was
+sitting in the repository, written for exactly this, unrun. Reasoning about
+infrastructure is not evidence about infrastructure.
 
 Both Redis calls in the read path are now guarded, and the guarantee is wider
 than it was: **a dead cache degrades to slower, not to down.** Reads fall
@@ -170,3 +181,24 @@ Cloud Run's `us-east1` without the organization's policy changing, so the
 cross-region hop on an archive read is fixed cost rather than something to tune.
 At one GET on a cache miss it does not matter; it would matter if this ever
 became a hot path, and it cannot become one by design.
+
+## Addendum, 2026-10-20 — `oaud`, not `aud`
+
+The trust policy under *Federation, not keys* pinned
+`accounts.google.com:aud` to the token audience. That condition can never match.
+For the built-in `accounts.google.com` provider AWS maps `:aud` to the token's
+`azp` claim when one is present, falling back to `aud`; Google service account
+identity tokens do carry `azp`, set to the account's numeric unique id. So AWS
+was comparing `116924920265042331650` against `mise-extractor-aws`.
+
+`accounts.google.com:oaud` maps to `aud` unconditionally and is correct either
+way. `:sub` is unchanged and remains the actual security boundary — the audience
+condition stops a token minted for another purpose being replayed, it does not
+decide who may assume the role.
+
+The failure mode is worth recording separately from the fix. AWS returns
+`AccessDenied: Not authorized to perform sts:AssumeRoleWithWebIdentity` with no
+mention of which claim, which condition or what value it compared, so a trust
+policy that is one key away from correct is indistinguishable from a missing
+permission. Anyone debugging this will reasonably start with IAM grants, and
+they will be looking in the wrong place.
