@@ -261,3 +261,24 @@ variable "site_url" {
   type        = string
   default     = ""
 }
+
+// ---------------------------------------------------------------------------
+// AWS. The extractor's durable recipe archive and the dead-letter alarm.
+// ---------------------------------------------------------------------------
+
+variable "aws_region" {
+  description = "AWS region for the recipe archive and CloudWatch alarm."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "alert_email" {
+  description = "Where the dead-letter-queue alarm goes. Empty disables the SNS subscription; the topic and alarm are still created, so wiring an endpoint later needs no code change."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.alert_email == "" || can(regex("^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$", var.alert_email))
+    error_message = "alert_email must be an email address, or empty to skip the subscription."
+  }
+}

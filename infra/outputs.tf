@@ -127,3 +127,24 @@ output "extractor_grpc_address" {
   description = "host:443 for the BFF's EXTRACTOR_GRPC_ADDRESS. Cloud Run terminates TLS, so this is not the :50051 of local dev."
   value       = "${replace(google_cloud_run_v2_service.extractor.uri, "https://", "")}:443"
 }
+
+// ---------------------------------------------------------------------------
+// AWS. None of these is a secret — that is the point of federating the GCP
+// identity rather than storing a key. They are wired onto the Cloud Run service
+// by cloudrun.tf, so there is nothing to copy by hand.
+// ---------------------------------------------------------------------------
+
+output "recipe_bucket" {
+  description = "S3 bucket holding the durable copy of every extracted recipe."
+  value       = aws_s3_bucket.recipes.id
+}
+
+output "extractor_aws_role_arn" {
+  description = "Role the Cloud Run extractor assumes with its GCP identity token."
+  value       = aws_iam_role.extractor.arn
+}
+
+output "alerts_topic_arn" {
+  description = "SNS topic the dead-letter alarm publishes to."
+  value       = aws_sns_topic.alerts.arn
+}

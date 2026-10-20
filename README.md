@@ -38,6 +38,11 @@ and cook from with timers.
   the step, find the quantity, and come back with wet hands. Inline timers
   survive a locked phone, because they count from a wall-clock timestamp rather
   than ticking down.
+- **Recipes survive the cache.** Redis expires an entry after seven days, which
+  twice sent the live page to 404 for a recipe that had already been extracted
+  correctly. S3 is the copy that does not expire, reached by federating the
+  service's own GCP identity into an AWS role — no access key exists anywhere.
+  See [ADR 0007](docs/adr/0007-recipe-archive.md).
 - **Accounts.** Google OAuth2, JWT sessions over database users, RBAC. Save
   recipes, keep notes, count cooks. Verified creators can correct extractions of
   their own videos; anyone can keep their own edited version of any recipe.
@@ -59,8 +64,8 @@ apps/extractor    Python 3.12 — owns every LLM call. gRPC surface + worker poo
 packages/scaling  pure TypeScript scaling engine, zero runtime deps
 packages/schema   the recipe contract (zod), mirrored in Pydantic, plus the
                   protobuf service definition
-infra             Terraform: Neon, Upstash, Vercel, Grafana, Cloud Run
-docs/adr          six architecture decision records
+infra             Terraform: Neon, Upstash, Vercel, Grafana, Cloud Run, AWS
+docs/adr          seven architecture decision records
 docs/design       the design system and its measured contrast table
 ```
 
@@ -91,7 +96,7 @@ them the app still serves recipes and simply has no accounts and no queue.
 | `pnpm --filter @mise/web e2e` | Playwright — 31 specs, mobile and desktop |
 | `pnpm lint` / `pnpm typecheck` | across all workspaces |
 | `pnpm --filter @mise/web migrate` | apply `apps/extractor/migrations/*.sql` (`--dry` to list) |
-| `uv run pytest` | extractor — 410 tests (from `apps/extractor`) |
+| `uv run pytest` | extractor — 426 tests (from `apps/extractor`) |
 | `./scripts/codegen.sh` | regenerate gRPC stubs after editing the proto |
 
 ## Deployment
@@ -150,6 +155,7 @@ glossed.
 | [0004](docs/adr/0004-analytics-and-retention.md) | Retention cohorts, defined before there is anyone to measure |
 | [0005](docs/adr/0005-cloud-run-topology.md) | One process, one port, no keys; scale-to-zero and what it costs |
 | [0006](docs/adr/0006-video-fallback.md) | Watching the video when the description has no recipe |
+| [0007](docs/adr/0007-recipe-archive.md) | A durable tier under the cache, reached without a stored key |
 
 Every outage and every bug that reached a user is in
 [`docs/INCIDENTS.md`](docs/INCIDENTS.md).

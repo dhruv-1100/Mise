@@ -29,8 +29,15 @@ import logging
 import os
 import signal
 
+from app.archive import from_environment as archive_from_environment
 from app.grpc_server import serve
 from app.llm import GeminiProvider
+from app.metrics import (
+    CloudWatchSink,
+    NullSink,
+    namespace_from_environment,
+    publish_dead_letters,
+)
 from app.queue import ExtractionQueue
 from app.worker import run_pool
 from app.youtube import YouTubeFetcher
@@ -89,7 +96,21 @@ async def main() -> None:
     from redis.asyncio import from_url
 
     redis = from_url(redis_url, decode_responses=True)
-    queue = ExtractionQueue(redis=redis)
+
+    # Durable storage under the cache. NullArchive when AWS is unconfigured, so
+    # this is a no-op on a deployment that has none — see app/archive.py.
+    archive = archive_from_environment()
+    queue = ExtractionQueue(redis=redis, archive=archive)
+
+    # The dead-letter gauge rides on the archive's credentials: same role, same
+    # assume-role cycle. Off unless both the namespace and a real archive are
+    # configured, because without federation there is nothing to publish with.
+    namespace = namespace_from_environment()
+    sink = (
+        CloudWatchSink(namespace=namespace, region=os.environ["AWS_REGION"], credentials=archive)
+        if namespace is not None and hasattr(archive, "cloudwatch")
+        else NullSink()
+    )
     fetcher = YouTubeFetcher(youtube_key)
     provider = GeminiProvider(gemini_key)
 
@@ -103,6 +124,8 @@ async def main() -> None:
 
     server = await serve(queue, port=port)
     logger.info("extractor up: gRPC on :%d, %d worker(s)", port, pool_size)
+
+    metrics = asyncio.create_task(publish_dead_letters(source=queue, sink=sink, stop=stop))
 
     workers = asyncio.create_task(
         run_pool(
@@ -127,7 +150,8 @@ async def main() -> None:
         # expires first, Cloud Run kills the process and the job's lease lapses,
         # which the queue's retry path already handles.
         workers.cancel()
-        await asyncio.gather(workers, return_exceptions=True)
+        metrics.cancel()
+        await asyncio.gather(workers, metrics, return_exceptions=True)
 
         await fetcher.aclose()
         await redis.aclose()

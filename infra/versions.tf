@@ -20,6 +20,10 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 7.45"
     }
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.20"
+    }
 
     # Community-maintained. Neon publishes no official Terraform provider —
     # see infra/README.md before depending on it.

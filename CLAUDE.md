@@ -51,7 +51,10 @@ phases.
   `units.py` (canonical
   grams/ml), `evaluation.py` (scoring against ground truth), `queue.py`
   (Redis-backed jobs: idempotency, retry/DLQ, cache, backpressure),
-  `worker.py` (drains the queue), `grpc_server.py` (the BFF-facing surface).
+  `worker.py` (drains the queue), `grpc_server.py` (the BFF-facing surface),
+  `archive.py` (S3 as the durable tier under the Redis cache — ADR 0007),
+  `metrics.py` (publishes dead-letter depth to CloudWatch, where an SNS alarm
+  watches it).
   `server.py` is the production entrypoint and the only thing that starts those
   last two: the container runs `python -m app.server`, which binds gRPC to
   `$PORT` and runs the worker pool in the same process. The FastAPI app in
@@ -72,7 +75,9 @@ phases.
   `packages/schema/src/gen/` by `./scripts/codegen.sh` and committed, and CI
   regenerates and diffs them so they cannot drift from the proto.
 - `infra/` — Terraform (Phase 1), all applied and live: Neon, Upstash, Vercel,
-  Grafana and Cloud Run. Railway was dropped for having no free tier; see
+  Grafana and Cloud Run, plus AWS (S3 archive, SNS, CloudWatch alarm) from
+  ADR 0007. `terraform apply` needs AWS credentials; the running service needs
+  none — it federates its own GCP identity into an IAM role. Railway was dropped for having no free tier; see
   `infra/README.md`.
 
 Accounts live entirely in `apps/web`: `auth.ts` (Auth.js v5, Google, JWT
@@ -175,6 +180,12 @@ uv run --frozen python scripts/smoke_grpc.py HOST:443
 
 # Roll back to the previous revision.
 gcloud run services update-traffic mise-prod-extractor --to-revisions=PREVIOUS=100
+
+# Prove the AWS tier works. Needs YOUR credentials, not the service's — it has
+# none. The federation only happens inside Cloud Run, so this checks the result
+# rather than the mechanism.
+cd apps/extractor
+uv run --frozen python scripts/verify_aws.py VIDEO_ID
 ```
 
 ## Testing

@@ -24,15 +24,19 @@ Four behaviours are deliberate rather than incidental:
 from __future__ import annotations
 
 import json
+import logging
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
+from app.archive import NullArchive, RecipeArchive
 from app.schema import Job, JobError, JobStage, JobState
 
 QUEUE_KEY = "mise:queue"
 DLQ_KEY = "mise:dlq"
+logger = logging.getLogger(__name__)
+
 JOB_KEY = "mise:job:{job_id}"
 VIDEO_KEY = "mise:video:{video_id}"
 CACHE_KEY = "mise:cache:{video_id}"
@@ -116,6 +120,11 @@ class ExtractionQueue:
     redis: RedisLike
     max_depth: int = MAX_QUEUE_DEPTH
     max_attempts: int = MAX_ATTEMPTS
+
+    #: Durable storage under the cache. Defaults to a no-op, so a deployment
+    #: without AWS behaves exactly as it did before this existed — and so every
+    #: test that does not care about archiving stays unchanged.
+    archive: RecipeArchive = field(default_factory=NullArchive)
 
     # --- enqueue -----------------------------------------------------------
 
@@ -205,6 +214,19 @@ class ExtractionQueue:
             recipe_json,
             ex=_cache_ttl_for(recipe_json),
         )
+        # After Redis, and guarded here rather than only inside the archive.
+        # The extraction has already succeeded; failing it because the durable
+        # copy did not land would trade a working result for no result.
+        #
+        # S3Archive swallows its own errors too, so this looks redundant. It is
+        # not: RecipeArchive is a Protocol, and a Protocol cannot require an
+        # implementation to be best-effort. Guarding at the call site makes the
+        # guarantee true for every implementation rather than for the one that
+        # remembered.
+        try:
+            await self.archive.put(job.video_id, recipe_json)
+        except Exception as exc:
+            logger.warning("archive write failed for %s: %s", job.video_id, exc)
         updated = job.model_copy(
             update={
                 "state": JobState.SUCCEEDED,
@@ -261,8 +283,37 @@ class ExtractionQueue:
         return Job.model_validate_json(raw) if raw else None
 
     async def cached_recipe(self, video_id: str) -> dict[str, Any] | None:
+        """The recipe, from the cache or from under it.
+
+        Redis first, then the archive. A hit in the archive is re-warmed into
+        Redis on the way out: the next reader should not pay for the same S3
+        round trip, and the entry that expired was a cache entry, not the
+        recipe.
+
+        Returns None only when neither tier has it — which is the one case that
+        genuinely needs an extraction.
+        """
         raw = await self.redis.get(CACHE_KEY.format(video_id=video_id))
-        return json.loads(raw) if raw else None
+        if raw:
+            return json.loads(raw)
+
+        try:
+            archived = await self.archive.get(video_id)
+        except Exception as exc:
+            logger.warning("archive read failed for %s: %s", video_id, exc)
+            return None
+        if archived is None:
+            return None
+
+        # Re-warm. Written with the positive TTL: an archived recipe is a
+        # success by definition, since insufficient results are archived too but
+        # are equally durable facts about the video.
+        await self.redis.set(
+            CACHE_KEY.format(video_id=video_id),
+            json.dumps(archived),
+            ex=_cache_ttl_for(json.dumps(archived)),
+        )
+        return archived
 
     async def depth(self) -> int:
         return await self.redis.llen(QUEUE_KEY)

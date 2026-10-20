@@ -98,6 +98,39 @@ resource "google_cloud_run_v2_service" "extractor" {
         value = "rediss://default:${upstash_redis_database.main.password}@${upstash_redis_database.main.endpoint}:${upstash_redis_database.main.port}"
       }
 
+      // AWS, reached by federating this service account's own identity. There
+      // is deliberately no AWS_ACCESS_KEY_ID here and no key anywhere to leak;
+      // the container exchanges a GCP token for short-lived credentials at
+      // runtime. See infra/aws.tf and docs/adr/0007-recipe-archive.md.
+      //
+      // All four are optional at boot: without them the archive is simply off
+      // and Redis behaves as it did before, which keeps a deployment with no
+      // AWS account working.
+      env {
+        name  = "AWS_REGION"
+        value = var.aws_region
+      }
+
+      env {
+        name  = "RECIPE_BUCKET"
+        value = aws_s3_bucket.recipes.id
+      }
+
+      env {
+        name  = "AWS_ROLE_ARN"
+        value = aws_iam_role.extractor.arn
+      }
+
+      env {
+        name  = "AWS_TOKEN_AUDIENCE"
+        value = local.aws_token_audience
+      }
+
+      env {
+        name  = "CLOUDWATCH_NAMESPACE"
+        value = local.cloudwatch_namespace
+      }
+
       // A TCP probe, not an HTTP one.
       //
       // The container now serves gRPC on this port, so GET /healthz would be

@@ -181,6 +181,42 @@ autoscaling, Neon history retention beyond the free cap, Cloud Run traffic past
 the monthly free allowance, and any Grafana Cloud usage past the free metric
 series limit.
 
+## AWS
+
+Added by [ADR 0007](../docs/adr/0007-recipe-archive.md): an S3 bucket that holds
+the durable copy of every extracted recipe, and a CloudWatch alarm on
+dead-letter-queue depth that mails through SNS.
+
+**`terraform apply` needs AWS credentials. The running service does not.** It
+federates its own GCP identity into an IAM role, the same trick `github.tf`
+plays in the other direction. There is no access key in this repo, in Terraform
+state, or on the Cloud Run service.
+
+```bash
+export AWS_PROFILE=...                 # or AWS_ACCESS_KEY_ID / _SECRET_ACCESS_KEY
+export TF_VAR_alert_email='you@example.com'   # optional; empty skips the subscription
+terraform -chdir=infra apply
+```
+
+SNS email subscriptions need confirming — check your inbox after the first
+apply, or the alarm fires into nothing.
+
+**Set a billing alarm before you apply.** The resources here sit inside the free
+allowances at this volume (one small bucket, a handful of objects a day, one
+custom metric), but AWS does not cap spend by default. Billing → Budgets → a $5
+alert takes a minute and is the difference between a surprise and a notification.
+
+Afterwards, check it actually works rather than assuming:
+
+```bash
+cd apps/extractor
+uv run --frozen python scripts/verify_aws.py VIDEO_ID
+```
+
+That reads the bucket from `terraform output`, confirms the recipe object landed,
+and reports whether the dead-letter gauge is publishing. A miss there means the
+service could not assume the role — the Cloud Run logs will say so.
+
 ## Deploying
 
 `.github/workflows/deploy.yml` builds the extractor image and rolls a Cloud Run
