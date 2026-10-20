@@ -4,33 +4,53 @@
 
 A web app that converts cooking videos into structured, scalable recipes.
 
-**Status:** Phases 0, 2.1, 3, 4, 5 complete. Phase 6 is built — paste a URL,
-watch live stages, get a scalable recipe with cook mode; sign in with Google to
-save, note and count cooks; verified creators can correct extractions of their
-own videos; seven product events firing with retention cohorts defined. Its exit criteria are met: both halves are
-deployed, and Lighthouse scores 100 on performance and accessibility across the
-home, recipe and cook routes (`docs/METRICS.md`).
-Phase 2.3 works from a real YouTube URL: fetch -> normalize -> extract -> units,
-exposed as `POST /extract`. Entity
-resolution and the sanity-rule validator are still open, and there is no
-accuracy number until the Phase 2.2 labelled set exists. Phase 1 nearly done: CI
-is green and all five providers are provisioned via Terraform — Neon, Upstash,
-Vercel, Grafana and Cloud Run — with a clean plan. **The extractor is deployed and serving.** `deploy.yml`
-builds the image and rolls a Cloud Run revision after CI passes on main,
+**Status:** Phases 0, 2.1, 3, 4, 5 complete, and Phase 1 is done — CI is green
+and every provider is provisioned by Terraform: Neon, Upstash, Vercel, Grafana,
+Cloud Run, and AWS (S3 archive, SNS, CloudWatch) from ADR 0007.
+
+Phase 6 is built and its exit criteria are met — paste a URL, watch live stages,
+get a scalable recipe with cook mode; sign in with Google to save, note and
+count cooks; verified creators can correct extractions of their own videos;
+seven product events firing with retention cohorts defined. Lighthouse scores
+100 on performance and accessibility across the home, recipe and cook routes
+(`docs/METRICS.md`).
+
+**Both halves are deployed and working.** The extractor serves gRPC from Cloud
+Run; `deploy.yml` builds the image and rolls a revision after CI passes on main,
 authenticating with Workload Identity Federation so no key is stored anywhere.
-Verified end to end against the live service on 2026-08-28: a real video
-enqueued, drained by the worker and cached, in 91.5s. See
-`docs/adr/0005-cloud-run-topology.md`. **The web app is live too**, at
-https://mise-prod.vercel.app — Vercel builds it from the GitHub integration on
-every push to main. Accounts are the one thing that does not work there:
-`/api/auth/providers` returns Auth.js's server-configuration error because
-`AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` and `NEXT_PUBLIC_SITE_URL`
-are not set on the project. The tables exist in Neon and hold zero rows — not
-one sign-in has ever happened, so every account path is code-complete and
-entirely unexercised. Four values and an apply away; see `infra/README.md`. The headline finding so far is
-`docs/adr/0001-content-sourcing.md` — captions are unreachable without creator
-OAuth, so descriptions are the primary source. See `BUILD_PLAN.md` for all 12
-phases.
+The web app is live at https://mise-prod.vercel.app, built by Vercel's GitHub
+integration on every push to main. **Sign-in works** — Google OAuth is
+configured and exercised; the accounts tables in Neon are no longer empty.
+
+Phase 2.3 works from a real YouTube URL: fetch -> normalize -> extract -> units,
+exposed as `POST /extract`. Entity resolution and the sanity-rule validator are
+still open, and **there is still no accuracy number**, because the Phase 2.2
+labelled set stands at 1 of 50 videos. That is the single highest-value
+unfinished thing in this repository: it unlocks the accuracy metric, a nightly
+regression gate, and the description-versus-video comparison ADR 0006 assumes
+but has never measured.
+
+**Read `docs/INCIDENTS.md` before trusting anything here.** Two entries dated
+2026-10-20 are load-bearing context. Upstash deleted the free-tier Redis
+database after 14 days without traffic and production was hard-down for an
+unknown period, because nothing was watching; `.github/workflows/canary.yml` now
+probes production daily, which is both the alarm and the traffic that prevents a
+recurrence. Separately, the S3 archive had **never once worked** — the IAM trust
+policy pinned `accounts.google.com:aud` where AWS requires `:oaud`, so every
+federation attempt was rejected and the bucket sat empty from the day it
+shipped, while ADR 0007 described the mechanism as working. Both are fixed and
+verified in production, writes and reads.
+
+The lesson those two share is worth carrying into any session here: in this
+codebase, failures tend to be *silent*. Best-effort error handling, Terraform
+variables defaulting to `""`, and a deliberately liveness-only health check each
+convert a failure into a non-event. Prefer checking the thing over reasoning
+about the thing — `scripts/verify_aws.py` existed for months and would have
+caught the second incident on day one, unrun.
+
+The headline research finding remains `docs/adr/0001-content-sourcing.md` —
+captions are unreachable without creator OAuth, so descriptions are the primary
+source. See `BUILD_PLAN.md` for all 12 phases.
 
 ## Architecture
 
@@ -52,7 +72,9 @@ phases.
   grams/ml), `evaluation.py` (scoring against ground truth), `queue.py`
   (Redis-backed jobs: idempotency, retry/DLQ, cache, backpressure),
   `worker.py` (drains the queue), `grpc_server.py` (the BFF-facing surface),
-  `archive.py` (S3 as the durable tier under the Redis cache — ADR 0007),
+  `archive.py` (S3 as the durable tier under the Redis cache — ADR 0007;
+  best-effort by design, so its failures are a log line and nothing else,
+  which is exactly how it stayed broken for its whole first day),
   `metrics.py` (publishes dead-letter depth to CloudWatch, where an SNS alarm
   watches it).
   `server.py` is the production entrypoint and the only thing that starts those
@@ -77,8 +99,20 @@ phases.
 - `infra/` — Terraform (Phase 1), all applied and live: Neon, Upstash, Vercel,
   Grafana and Cloud Run, plus AWS (S3 archive, SNS, CloudWatch alarm) from
   ADR 0007. `terraform apply` needs AWS credentials; the running service needs
-  none — it federates its own GCP identity into an IAM role. Railway was dropped for having no free tier; see
+  none — it federates its own GCP identity into an IAM role, whose trust policy
+  pins `accounts.google.com:oaud` and **not** `:aud`; the latter silently never
+  matches, see ADR 0007. Railway was dropped for having no free tier; see
   `infra/README.md`.
+
+  **Never run a bare `terraform apply` here.** Every credential comes from
+  `TF_VAR_*` in a shell, and five of them default to `""` rather than failing —
+  an apply from a shell that has lost its exports destroys the Vercel
+  environment variables and breaks sign-in, with no error. `plan -out`, confirm
+  `0 to destroy`, then apply the saved file. `source infra/load-state-vars.sh`
+  restores the nine values Terraform already holds in state, including
+  `auth_secret`, which exists nowhere else on earth. `var.aws_region` must stay
+  `us-east-2`: the AWS account belongs to an organization whose service control
+  policy denies regional services anywhere else.
 
 Accounts live entirely in `apps/web`: `auth.ts` (Auth.js v5, Google, JWT
 sessions over database users), `lib/db.ts` (Neon over HTTPS — no ORM, hand
@@ -173,6 +207,13 @@ Deployment. The extractor image is built and rolled by
 Vercel's git integration. Neither needs a key — CI federates into Google with
 OIDC. Setup and the six repository variables are in `infra/README.md`.
 
+`.github/workflows/canary.yml` probes production daily with the same
+`smoke_grpc.py` the deploy gate runs. It is doing two jobs: catching an outage
+nobody is looking at, and generating the traffic that stops Upstash deleting the
+free-tier database after 14 days idle. Note that `smoke_grpc.py` makes two calls
+deliberately — `GetRecipe` can no longer fail because of Redis now that the read
+path falls through to S3, so `GetStatus` is the one that proves Redis answered.
+
 ```bash
 # What the deploy workflow does last, runnable by hand against any address.
 cd apps/extractor
@@ -183,7 +224,9 @@ gcloud run services update-traffic mise-prod-extractor --to-revisions=PREVIOUS=1
 
 # Prove the AWS tier works. Needs YOUR credentials, not the service's — it has
 # none. The federation only happens inside Cloud Run, so this checks the result
-# rather than the mechanism.
+# rather than the mechanism. RUN IT after any change to infra/aws.tf: it is the
+# only thing that distinguishes a working archive from a silent one, and it sat
+# unrun while the archive was completely non-functional.
 cd apps/extractor
 uv run --frozen python scripts/verify_aws.py VIDEO_ID
 ```
