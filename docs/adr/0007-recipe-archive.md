@@ -121,3 +121,52 @@ datapoint, and treating missing data as a breach would page on an idle service.
   default — set a budget alert before applying.
 - **`terraform apply` now needs AWS credentials** alongside the existing five
   providers. The running service still needs none.
+
+## Addendum, 2026-10-20 — the scope was too narrow
+
+This ADR scoped the archive to cache *expiry*: a recipe aging out of a Redis
+that is otherwise healthy. Four days after it was written, Upstash deleted the
+free-tier database for fourteen days of inactivity and the distinction turned
+out to matter enormously.
+
+`cached_recipe` read Redis unguarded before falling through, so an unreachable
+database raised `ConnectionError` out of the servicer and the archive was never
+consulted. Every recipe that this tier existed to protect was sitting durably in
+S3 and was unreachable for the whole outage. The durable tier was present,
+correct, and bypassed — which is worse than not having built it, because it
+bought a confidence it did not deliver.
+
+Both Redis calls in the read path are now guarded, and the guarantee is wider
+than it was: **a dead cache degrades to slower, not to down.** Reads fall
+through to S3; writes still fail loudly, because a queue that accepts a job it
+cannot store has lost the job silently.
+
+Two things follow that were not obvious when this was written:
+
+- **`Health` cannot be the signal.** It returned `ok` throughout, exactly as
+  the rpc comment in `extractor.proto` promises — liveness only, so an
+  orchestrator cannot restart a healthy service because Redis is slow. That
+  design is still right. It simply means something else has to ask.
+- **The fix removed the deploy gate's only Redis check.** Falling through to
+  the archive means `GetRecipe` answers `found: false` whether the cache is
+  empty or absent, so `smoke_grpc.py`'s documented claim that "a missing
+  `REDIS_URL` fails here" quietly became false. It now also calls `GetStatus`,
+  whose `queue.get` reads Redis unguarded, making `NOT_FOUND` the proof that
+  Redis answered. A resilience change that blinds a monitor is a bad trade, and
+  it was nearly made silently.
+
+`docs/INCIDENTS.md` has the full timeline.
+
+## Addendum, 2026-10-20 — region is a constraint, not a choice
+
+`var.aws_region` now defaults to `us-east-2`. The AWS account is a member of an
+organization it does not control, whose service control policy denies regional
+services everywhere else; an apply at the previous `us-east-1` default failed
+with an explicit SCP deny on `s3:CreateBucket` and `SNS:CreateTopic` while the
+IAM role in the same run succeeded, IAM being global.
+
+This constrains any future move. The bucket cannot be relocated to sit nearer
+Cloud Run's `us-east1` without the organization's policy changing, so the
+cross-region hop on an archive read is fixed cost rather than something to tune.
+At one GET on a cache miss it does not matter; it would matter if this ever
+became a hot path, and it cannot become one by design.
