@@ -47,6 +47,11 @@ venv/
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+# A saved plan is not a summary, it is a serialised copy of every value the
+# apply will write — database passwords, the Auth.js secret, API keys. `plan
+# -out` is the recommended workflow here (see README), so these files exist
+# routinely and must never be committable.
+*.tfplan
 # NOTE: .terraform.lock.hcl is deliberately NOT ignored. It pins provider
 # versions and hashes the same way pnpm-lock.yaml does, and Terraform expects
 # it in version control.

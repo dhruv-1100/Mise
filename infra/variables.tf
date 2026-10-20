@@ -269,7 +269,24 @@ variable "site_url" {
 variable "aws_region" {
   description = "AWS region for the recipe archive and CloudWatch alarm."
   type        = string
-  default     = "us-east-1"
+
+  // us-east-2 is not a preference, it is the only region that works. This AWS
+  // account is a member of an organization it does not control, and that
+  // organization's service control policy denies regional services outside
+  // us-east-2. On 2026-10-20 an apply at the default us-east-1 failed with
+  //
+  //   AccessDenied ... with an explicit deny in a service control policy
+  //
+  // on both s3:CreateBucket and SNS:CreateTopic, while the IAM role in the
+  // same apply succeeded — IAM being global, and global services being the
+  // usual carve-out in a region-restricting SCP.
+  //
+  // The default matters more than it looks. Every credential here comes from
+  // TF_VAR_* in a shell, and shells are lost; the same apply that found this
+  // also found that a lost export silently destroys Vercel environment
+  // variables. A region that only works when someone remembers to export it is
+  // the same failure waiting in a different place.
+  default = "us-east-2"
 }
 
 variable "alert_email" {

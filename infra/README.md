@@ -173,6 +173,41 @@ anywhere.
 
 Move to a remote backend before CI ever applies.
 
+There is a second consequence, found the hard way on 2026-10-20: state is not
+merely a convenience, it is the **only copy** of some of these values.
+`auth_secret` exists nowhere else — no console reissues it, and generating a
+fresh one invalidates every signed-in session. Losing this file is a recovery
+operation, not an inconvenience.
+
+The same day proved it cuts the other way too. `infra/load-state-vars.sh`
+restores the eight `TF_VAR_*` values that state already holds, so a shell that
+has lost its exports does not have to go hunting through five consoles:
+
+```bash
+source infra/load-state-vars.sh   # prints lengths only, never values
+```
+
+The five provider credentials are deliberately absent from it. They configure
+providers rather than resources, so Terraform never stores them.
+
+### Never apply from a bare shell
+
+Run `plan -out`, read it, then apply the saved file:
+
+```bash
+terraform -chdir=infra plan -out=run.tfplan
+terraform -chdir=infra apply run.tfplan
+```
+
+This is not ceremony. Seven variables fail loudly when unset, but
+`auth_secret`, `google_oauth_client_id`, `google_oauth_client_secret`,
+`site_url` and `posthog_key` all default to `""`, and `vercel.tf` builds its
+`for_each` key set with `compact()`. An empty value therefore does not write a
+blank variable — it **destroys** the environment variable. An apply from a
+shell missing those exports looks entirely routine and silently breaks sign-in.
+
+`0 to destroy` is the line to check before every apply in this project.
+
 ### Free tiers
 
 Everything targets a free tier. Total should sit near $0–15/month, which is
@@ -200,6 +235,23 @@ terraform -chdir=infra apply
 
 SNS email subscriptions need confirming — check your inbox after the first
 apply, or the alarm fires into nothing.
+
+**The region is `us-east-2` and is not negotiable.** This AWS account belongs to
+an organization it does not control, and that organization's service control
+policy denies regional services everywhere else. The first apply ran at the
+then-default `us-east-1` and failed with
+
+```
+AccessDenied: User: arn:aws:iam::...:user/mise-terraform is not authorized to
+perform: s3:CreateBucket ... with an explicit deny in a service control policy
+```
+
+on both S3 and SNS, while the IAM role in the same run succeeded — IAM is
+global, and global services are the usual carve-out in a region-restricting SCP.
+`var.aws_region` now defaults to `us-east-2`, so this needs no export. If a
+future apply hits an explicit SCP deny, check the region before anything else,
+and make `~/.aws/config` agree or `verify_aws.py` will query an empty region and
+report a working system as broken.
 
 **Set a billing alarm before you apply.** The resources here sit inside the free
 allowances at this volume (one small bucket, a handful of objects a day, one
