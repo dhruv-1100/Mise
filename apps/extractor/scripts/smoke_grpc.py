@@ -8,10 +8,27 @@ single request:
   * TLS terminates at Cloud Run's frontend            (a wrong address fails here)
   * the frontend forwards HTTP/2 to the container     (a missing h2c port name fails here)
   * the servicer is registered on the port            (a wrong entrypoint fails here)
-  * GetRecipe reads the cache, which reads Redis      (a missing REDIS_URL fails here)
+  * GetRecipe reads the cache, then the archive       (a broken read path fails here)
+  * GetStatus reads Redis, unguarded                  (a missing REDIS_URL fails here)
 
 Each of those was a real possibility when this was written, and none of them is
 visible from a green deploy step.
+
+WHY THERE ARE TWO CALLS. There was one until 2026-10-20. On that day Upstash
+deleted the free-tier database for inactivity, and the fix — falling through to
+the S3 archive instead of propagating the ConnectionError — had a consequence
+nobody would have noticed until the next outage: GetRecipe stopped being able
+to fail because of Redis. It now answers `found: false` whether the cache is
+empty or absent, which is correct for a caller and useless for a probe.
+
+GetStatus is the probe that still fails. `queue.get` reads Redis without a
+guard, deliberately, so a job id nothing has ever created returns NOT_FOUND
+when Redis is reachable and UNKNOWN when it is not. It writes nothing, costs
+one GET, and is the only call here whose answer depends on Redis existing.
+
+Health is not used for this. It is liveness-only on purpose (see the comment on
+the rpc in extractor.proto) and returned `ok` throughout the 2026-10-20 outage,
+which is exactly what it promises and exactly why it cannot be the signal.
 
     uv run --frozen python scripts/smoke_grpc.py mise-extractor-xyz.a.run.app:443
 """
@@ -39,6 +56,10 @@ from app.gen import extractor_pb2_grpc as pb_grpc
 #: without depending on prior state.
 PROBE_VIDEO = "aaaaaaaaaaa"
 
+#: A job id nothing has ever created. NOT_FOUND is the pass; it is the proof
+#: that Redis answered. Reading a key that does not exist leaves no trace.
+PROBE_JOB = "canary-probe-no-such-job"
+
 #: Cloud Run scales to zero, so the first request pays a cold start: pulling the
 #: image, booting Python, opening Redis. Generous on purpose.
 TIMEOUT_SECONDS = 60.0
@@ -48,18 +69,43 @@ async def probe(address: str) -> int:
     creds = grpc.ssl_channel_credentials()
     async with grpc.aio.secure_channel(address, creds) as channel:
         stub = pb_grpc.ExtractorStub(channel)
+
         try:
-            response = await stub.GetRecipe(
+            recipe = await stub.GetRecipe(
                 pb.GetRecipeRequest(video_id=PROBE_VIDEO),
                 timeout=TIMEOUT_SECONDS,
             )
         except grpc.aio.AioRpcError as err:
-            print(f"FAIL {address}: {err.code().name}: {err.details()}", file=sys.stderr)
+            print(f"FAIL {address}: GetRecipe: {err.code().name}: {err.details()}", file=sys.stderr)
+            return 1
+
+        # NOT_FOUND is the success. Any other code means the read never reached
+        # Redis — which is the failure GetRecipe can no longer report.
+        try:
+            await stub.GetStatus(
+                pb.GetStatusRequest(job_id=PROBE_JOB),
+                timeout=TIMEOUT_SECONDS,
+            )
+        except grpc.aio.AioRpcError as err:
+            if err.code() is not grpc.StatusCode.NOT_FOUND:
+                print(
+                    f"FAIL {address}: Redis unreachable: {err.code().name}: {err.details()}",
+                    file=sys.stderr,
+                )
+                return 1
+        else:
+            # A job id nothing created came back as a real job. Either the
+            # probe id collided with a real one or the servicer is not the one
+            # this script thinks it is.
+            print(
+                f"FAIL {address}: GetStatus({PROBE_JOB}) found a job",
+                file=sys.stderr,
+            )
             return 1
 
     # `found` being False is the expected answer and a complete success: the
     # request crossed every layer above and came back with a real reply.
-    print(f"OK {address}: GetRecipe responded, found={response.found}")
+    print(f"OK {address}: GetRecipe found={recipe.found}, Redis reachable")
     return 0
 
 

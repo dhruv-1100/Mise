@@ -292,8 +292,23 @@ class ExtractionQueue:
 
         Returns None only when neither tier has it — which is the one case that
         genuinely needs an extraction.
+
+        Every Redis call here is guarded, which the write path deliberately is
+        not. On 2026-10-20 Upstash deleted the free-tier database after fourteen
+        days without traffic, and an unguarded `get` on this line meant the
+        ConnectionError propagated out of the servicer: the archive was never
+        consulted, and recipes that were sitting safely in S3 were unreachable.
+        A dead cache must degrade to "slower", not to "down".
+
+        Reads degrade; writes do not. An enqueue that cannot reach Redis has
+        nowhere to put the job, and accepting one it cannot store is the worse
+        failure — see `enqueue`.
         """
-        raw = await self.redis.get(CACHE_KEY.format(video_id=video_id))
+        try:
+            raw = await self.redis.get(CACHE_KEY.format(video_id=video_id))
+        except Exception as exc:
+            logger.warning("cache read failed for %s, trying the archive: %s", video_id, exc)
+            raw = None
         if raw:
             return json.loads(raw)
 
@@ -308,11 +323,17 @@ class ExtractionQueue:
         # Re-warm. Written with the positive TTL: an archived recipe is a
         # success by definition, since insufficient results are archived too but
         # are equally durable facts about the video.
-        await self.redis.set(
-            CACHE_KEY.format(video_id=video_id),
-            json.dumps(archived),
-            ex=_cache_ttl_for(json.dumps(archived)),
-        )
+        try:
+            await self.redis.set(
+                CACHE_KEY.format(video_id=video_id),
+                json.dumps(archived),
+                ex=_cache_ttl_for(json.dumps(archived)),
+            )
+        except Exception as exc:
+            # The recipe is already in hand. Discarding it because the cache
+            # could not be re-warmed would throw away a successful read to
+            # report a failure of an optimisation.
+            logger.warning("cache re-warm failed for %s: %s", video_id, exc)
         return archived
 
     async def depth(self) -> int:

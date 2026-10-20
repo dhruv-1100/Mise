@@ -54,6 +54,23 @@ class BrokenArchive:
         raise RuntimeError("S3 unavailable")
 
 
+class BrokenRedis(FakeRedis):
+    """Redis unreachable, not merely empty.
+
+    Upstash deletes a free-tier database after fourteen days without traffic,
+    and on 2026-10-20 it did. The endpoint stopped resolving entirely, so every
+    call raised rather than returning None — a distinction the read path did not
+    originally make. Subclasses FakeRedis so it satisfies the same protocol;
+    only the two calls `cached_recipe` makes are overridden.
+    """
+
+    async def get(self, key):
+        raise ConnectionError("Error -2 connecting to redis:6379. Name or service not known.")
+
+    async def set(self, key, value, ex=None):
+        raise ConnectionError("Error -2 connecting to redis:6379. Name or service not known.")
+
+
 class TestKeys:
     def test_objects_live_under_the_granted_prefix(self):
         # The IAM policy in infra/aws.tf grants recipes/* and nothing else, so a
@@ -104,6 +121,46 @@ class TestReadFallthrough:
         # The one case that genuinely needs an extraction.
         q = ExtractionQueue(redis=FakeRedis(), archive=FakeArchive())
         assert run(q.cached_recipe(VIDEO)) is None
+
+
+class TestRedisUnreachable:
+    """The 2026-10-20 outage: a cache that is gone, not stale.
+
+    ADR 0007 scoped the archive to expiry. These assert the wider guarantee it
+    grew on the day the database was deleted — reads degrade to slower, never
+    to down.
+    """
+
+    def test_a_dead_redis_still_serves_from_the_archive(self):
+        archive = FakeArchive({VIDEO: RECIPE})
+        q = ExtractionQueue(redis=BrokenRedis(), archive=archive)
+
+        # Before the guard this raised ConnectionError out of the servicer and
+        # the archive was never consulted, so a recipe sitting safely in S3 was
+        # unreachable for the whole outage.
+        assert run(q.cached_recipe(VIDEO))["title"] == "Archived"
+        assert archive.reads == [VIDEO]
+
+    def test_a_failed_rewarm_does_not_discard_the_recipe(self):
+        # The subtler half: the archive read succeeded, so the recipe is in
+        # hand. Losing it because the cache could not be repopulated would turn
+        # a successful read into a failure of an optimisation.
+        q = ExtractionQueue(redis=BrokenRedis(), archive=FakeArchive({VIDEO: RECIPE}))
+        assert run(q.cached_recipe(VIDEO))["title"] == "Archived"
+
+    def test_both_tiers_down_is_None_rather_than_an_exception(self):
+        # Nothing to serve, but the caller gets the ordinary "not cached"
+        # answer and decides for itself. An exception here is a 500 on a page
+        # that could have said "extracting".
+        q = ExtractionQueue(redis=BrokenRedis(), archive=BrokenArchive())
+        assert run(q.cached_recipe(VIDEO)) is None
+
+    def test_writes_still_fail_loudly_when_redis_is_gone(self):
+        # Deliberately not guarded. A queue that accepts a job it cannot store
+        # has lost the job silently, which is worse than refusing the request.
+        q = ExtractionQueue(redis=BrokenRedis(), archive=FakeArchive())
+        with pytest.raises(ConnectionError):
+            run(q.enqueue(VIDEO))
 
 
 class TestWrite:
