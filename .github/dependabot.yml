@@ -1,0 +1,20 @@
+# Security updates only. A limit of 0 turns off routine version-bump pull
+# requests; security updates ignore it. They also need "Dependabot security
+# updates" switched on under the repository's Advanced Security settings.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+  - package-ecosystem: uv
+    directory: /apps/extractor
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0

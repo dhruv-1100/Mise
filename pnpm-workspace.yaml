@@ -9,3 +9,15 @@ onlyBuiltDependencies:
   - esbuild
   - sharp
   - unrs-resolver
+
+# Transitive packages pinned behind a security advisory, each inside its own
+# major version. Remove an entry once its parent ships the fix.
+#
+# sharp is deliberately absent. Next declares ^0.34 and the fixed versions are
+# 0.35, while the advisories are in image decoding and this app renders no
+# next/image, so nothing reaches it. Forcing a native dependency past its
+# declared range to silence an unreachable advisory is the worse trade.
+overrides:
+  dompurify: ^3.4.17
+  next>postcss: ^8.5.23
+  source-map-js: ^1.2.2
