@@ -7,6 +7,7 @@ about each other.
 
 import asyncio
 import json
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -14,6 +15,7 @@ from app.queue import (
     CACHE_KEY,
     CACHE_TTL_SECONDS,
     DLQ_KEY,
+    JOB_LEASE_SECONDS,
     NEGATIVE_CACHE_TTL_SECONDS,
     QUEUE_KEY,
     ExtractionQueue,
@@ -236,6 +238,63 @@ class TestSuccess:
         # Still cached, though: retrying the same failing video in one sitting
         # should not pay for a second extraction.
         assert run(queue.cached_recipe(VIDEO))["reason"] == "description_is_link_only"
+
+
+class TestAbandonedJobs:
+    """An instance can die mid-job, and nothing else will ever finish it.
+
+    Cloud Run gives a shutting-down process ten seconds, and an extraction takes
+    up to five minutes. The job's record stays RUNNING with no worker behind it,
+    and without a lease every resubmission is handed that same dead job for the
+    record's whole 24-hour life.
+    """
+
+    def _abandon(self, queue, age_seconds: int):
+        run(queue.enqueue(VIDEO))
+        job = run(queue.claim())
+        backdated = job.model_copy(
+            update={"started_at": datetime.now(UTC) - timedelta(seconds=age_seconds)}
+        )
+        run(queue._save(backdated))
+        return backdated
+
+    def test_a_running_job_inside_its_lease_is_left_alone(self, queue, redis):
+        job = self._abandon(queue, age_seconds=JOB_LEASE_SECONDS - 60)
+
+        again, is_new = run(queue.enqueue(VIDEO))
+
+        assert again.job_id == job.job_id
+        assert again.state is JobState.RUNNING
+        assert not is_new
+        assert redis.lists.get(QUEUE_KEY, []) == []
+
+    def test_a_lapsed_lease_puts_the_same_job_back_on_the_queue(self, queue, redis):
+        job = self._abandon(queue, age_seconds=JOB_LEASE_SECONDS + 60)
+
+        again, is_new = run(queue.enqueue(VIDEO))
+
+        # The same id on purpose: a client still watching the job sees it resume.
+        assert again.job_id == job.job_id
+        assert again.state is JobState.QUEUED
+        assert again.attempt == job.attempt + 1
+        assert is_new
+        assert redis.lists[QUEUE_KEY] == [job.job_id]
+
+    def test_a_job_that_keeps_killing_its_worker_is_dead_lettered(self, queue, redis):
+        run(queue.enqueue(VIDEO))
+        job = run(queue.claim())
+        for _ in range(queue.max_attempts):
+            backdated = job.model_copy(
+                update={"started_at": datetime.now(UTC) - timedelta(seconds=JOB_LEASE_SECONDS + 60)}
+            )
+            run(queue._save(backdated))
+            result, _ = run(queue.enqueue(VIDEO))
+            if result.state is JobState.QUEUED:
+                job = run(queue.claim())
+
+        assert result.state is JobState.FAILED
+        assert result.error.code == "worker_lost"
+        assert redis.lists[DLQ_KEY] == [result.job_id]
 
 
 class TestFailureAndRetry:

@@ -59,6 +59,14 @@ CACHE_TTL_SECONDS = 7 * 24 * 3600
 NEGATIVE_CACHE_TTL_SECONDS = 6 * 3600
 #: Job records outlive the work so a client can still poll a finished job.
 JOB_TTL_SECONDS = 24 * 3600
+#: How long a RUNNING job may go unfinished before it is presumed abandoned.
+#:
+#: Cloud Run gives a shutting-down instance ten seconds and an extraction takes
+#: up to five minutes, so an instance can die holding a job. Nothing else will
+#: ever finish that job, and until it is reclaimed every resubmission of the
+#: video is handed the same dead record. Matches the request timeout in
+#: infra/cloudrun.tf, which is the longest any request could have kept it alive.
+JOB_LEASE_SECONDS = 15 * 60
 
 
 class QueueFull(RuntimeError):
@@ -89,17 +97,22 @@ def _dump(job: Job) -> str:
     return job.model_dump_json(by_alias=True)
 
 
-def _cache_ttl_for(recipe_json: str) -> int:
-    """How long this result is worth keeping.
+def _is_insufficient(recipe_json: str) -> bool:
+    """Whether this result is a "no recipe here" rather than a recipe.
 
     Reads the payload rather than taking a flag, because `succeed` is called
     from two places and a flag is one more thing a caller can get wrong. The
     marker is the same `status` field the BFF discriminates on, so the two
     cannot disagree about what an insufficient result looks like.
     """
-    if '"insufficient_source_material"' in recipe_json:
-        return NEGATIVE_CACHE_TTL_SECONDS
-    return CACHE_TTL_SECONDS
+    return '"insufficient_source_material"' in recipe_json
+
+
+def _lease_lapsed(job: Job) -> bool:
+    """Whether a RUNNING job has outlived any worker that could be holding it."""
+    if job.state is not JobState.RUNNING or job.started_at is None:
+        return False
+    return _now() - job.started_at > timedelta(seconds=JOB_LEASE_SECONDS)
 
 
 def backoff_seconds(attempt: int, *, base: float = 2.0, cap: float = 60.0) -> float:
@@ -133,10 +146,10 @@ class ExtractionQueue:
 
         Checks cache first, then existing in-flight work, then capacity. Order
         matters: a cache hit must not be rejected for backpressure, because
-        serving it costs nothing.
+        serving it costs nothing. "Cache" includes the archive, so a recipe
+        that aged out of Redis costs one GET rather than another extraction.
         """
-        cached = await self.redis.get(CACHE_KEY.format(video_id=video_id))
-        if cached is not None:
+        if await self.cached_recipe(video_id) is not None:
             now = _now()
             job = Job(
                 job_id=_new_job_id(),
@@ -154,6 +167,12 @@ class ExtractionQueue:
             return job, False
 
         existing = await self._job_for_video(video_id)
+        if existing is not None and _lease_lapsed(existing):
+            # Through `fail` so the attempt counts: a video that kills its
+            # worker every time ends in the dead-letter queue, not in a loop.
+            return await self.fail(
+                existing, "worker_lost", "The instance running this job went away."
+            )
         if existing is not None and existing.state in (JobState.QUEUED, JobState.RUNNING):
             # Idempotent: the same video in flight returns the same job rather
             # than a second one racing it.
@@ -209,11 +228,16 @@ class ExtractionQueue:
         return updated
 
     async def succeed(self, job: Job, recipe_json: str) -> Job:
+        insufficient = _is_insufficient(recipe_json)
         await self.redis.set(
             CACHE_KEY.format(video_id=job.video_id),
             recipe_json,
-            ex=_cache_ttl_for(recipe_json),
+            ex=NEGATIVE_CACHE_TTL_SECONDS if insufficient else CACHE_TTL_SECONDS,
         )
+        # Recipes only. "No recipe here" is a statement about what this pipeline
+        # managed today, and archiving it would bring it back after every expiry
+        # and undo NEGATIVE_CACHE_TTL_SECONDS.
+        #
         # After Redis, and guarded here rather than only inside the archive.
         # The extraction has already succeeded; failing it because the durable
         # copy did not land would trade a working result for no result.
@@ -223,10 +247,11 @@ class ExtractionQueue:
         # implementation to be best-effort. Guarding at the call site makes the
         # guarantee true for every implementation rather than for the one that
         # remembered.
-        try:
-            await self.archive.put(job.video_id, recipe_json)
-        except Exception as exc:
-            logger.warning("archive write failed for %s: %s", job.video_id, exc)
+        if not insufficient:
+            try:
+                await self.archive.put(job.video_id, recipe_json)
+            except Exception as exc:
+                logger.warning("archive write failed for %s: %s", job.video_id, exc)
         updated = job.model_copy(
             update={
                 "state": JobState.SUCCEEDED,
@@ -239,16 +264,22 @@ class ExtractionQueue:
         await self.redis.delete(VIDEO_KEY.format(video_id=job.video_id))
         return updated
 
-    async def fail(self, job: Job, code: str, message: str) -> tuple[Job, bool]:
+    async def fail(
+        self, job: Job, code: str, message: str, *, permanent: bool = False
+    ) -> tuple[Job, bool]:
         """Record a failure. Returns (job, will_retry).
 
         Retries re-queue with the attempt count incremented; the final failure
         dead-letters. `backoff_seconds` says how long a worker should wait
         before picking the retry up — enforcing that delay is the worker loop's
         job, not the queue's, so this stays free of sleeping.
+
+        `permanent` is for a failure no retry could change. The job ends FAILED
+        so the client hears about it, but it is not a dead letter: the DLQ is
+        what the alarm watches, and a wrong link is not an incident.
         """
         attempt = job.attempt + 1
-        if attempt < self.max_attempts:
+        if not permanent and attempt < self.max_attempts:
             retried = job.model_copy(
                 update={
                     "state": JobState.QUEUED,
@@ -272,7 +303,8 @@ class ExtractionQueue:
             }
         )
         await self._save(dead)
-        await self.redis.rpush(DLQ_KEY, dead.job_id)
+        if not permanent:
+            await self.redis.rpush(DLQ_KEY, dead.job_id)
         await self.redis.delete(VIDEO_KEY.format(video_id=job.video_id))
         return dead, False
 
@@ -295,10 +327,9 @@ class ExtractionQueue:
 
         Every Redis call here is guarded, which the write path deliberately is
         not. On 2026-10-20 Upstash deleted the free-tier database after fourteen
-        days without traffic, and an unguarded `get` on this line meant the
-        ConnectionError propagated out of the servicer: the archive was never
-        consulted, and recipes that were sitting safely in S3 were unreachable.
-        A dead cache must degrade to "slower", not to "down".
+        days without traffic, which showed that an unguarded `get` on this line
+        would have raised out of the servicer without ever consulting the
+        archive. A dead cache must degrade to "slower", not to "down".
 
         Reads degrade; writes do not. An enqueue that cannot reach Redis has
         nowhere to put the job, and accepting one it cannot store is the worse
@@ -320,14 +351,13 @@ class ExtractionQueue:
         if archived is None:
             return None
 
-        # Re-warm. Written with the positive TTL: an archived recipe is a
-        # success by definition, since insufficient results are archived too but
-        # are equally durable facts about the video.
+        # Re-warm, in the compact form `succeed` wrote. Always the positive TTL:
+        # only recipes are archived.
         try:
             await self.redis.set(
                 CACHE_KEY.format(video_id=video_id),
-                json.dumps(archived),
-                ex=_cache_ttl_for(json.dumps(archived)),
+                json.dumps(archived, separators=(",", ":"), ensure_ascii=False),
+                ex=CACHE_TTL_SECONDS,
             )
         except Exception as exc:
             # The recipe is already in hand. Discarding it because the cache

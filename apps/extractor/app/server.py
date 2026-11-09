@@ -19,7 +19,8 @@ practice the BFF opens StreamStatus immediately after Extract and holds it for
 the life of the job, which is exactly the window the worker needs. The failure
 mode this leaves is real and documented in docs/adr/0005-cloud-run-topology.md:
 if every client disconnects mid-extraction the job stalls until the next request
-wakes an instance, at which point the worker claims it again.
+wakes the instance. If the instance is gone by then, the job is recovered by the
+lease in app/queue.py the next time someone submits the video.
 """
 
 from __future__ import annotations
@@ -147,8 +148,8 @@ async def main() -> None:
 
         # run_forever checks `stop` between jobs, never mid-job: a job cancelled
         # halfway leaves a RUNNING record nobody will finish. If the grace period
-        # expires first, Cloud Run kills the process and the job's lease lapses,
-        # which the queue's retry path already handles.
+        # expires first, Cloud Run kills the process and that is what happens;
+        # `enqueue` reclaims the job once JOB_LEASE_SECONDS has passed.
         workers.cancel()
         metrics.cancel()
         await asyncio.gather(workers, metrics, return_exceptions=True)

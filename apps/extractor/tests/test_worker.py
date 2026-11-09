@@ -223,6 +223,48 @@ class TestFailure:
         assert w.stats.dead_lettered == 1
         assert redis.lists[DLQ_KEY] == [job.job_id]
 
+    @pytest.mark.parametrize(
+        "failure", [FetchFailure.VIDEO_NOT_FOUND, FetchFailure.NOT_A_YOUTUBE_URL]
+    )
+    def test_a_video_that_cannot_exist_is_not_retried_or_dead_lettered(self, queue, redis, failure):
+        """A wrong link is a correct answer, not an incident.
+
+        Dead-lettering these meant one pasted link to a deleted video put the
+        alarm into ALARM, where it stays until someone drains the list. CloudWatch
+        only notifies on a transition, so every real failure after that one would
+        have been silent.
+        """
+        run(queue.enqueue(VIDEO))
+        w = worker(queue, fetch_error=FetchError(failure, "gone"))
+        job = run(w.run_once())
+
+        assert job.state is JobState.FAILED
+        assert job.error.code == failure.value
+        assert w.stats.retried == 0
+        assert w.stats.dead_lettered == 0
+        assert redis.lists.get(DLQ_KEY, []) == []
+
+    def test_a_rejected_video_can_be_submitted_again(self, queue):
+        run(queue.enqueue(VIDEO))
+        w = worker(queue, fetch_error=FetchError(FetchFailure.VIDEO_NOT_FOUND, "gone"))
+        run(w.run_once())
+
+        again, is_new = run(queue.enqueue(VIDEO))
+
+        assert is_new
+        assert again.state is JobState.QUEUED
+
+    @pytest.mark.parametrize("failure", [FetchFailure.QUOTA_EXCEEDED, FetchFailure.NOT_AUTHORISED])
+    def test_a_failure_of_ours_is_still_retried(self, queue, failure):
+        # Quota and a rejected API key say nothing about the video. They are
+        # exactly what the dead-letter alarm is for.
+        run(queue.enqueue(VIDEO))
+        w = worker(queue, fetch_error=FetchError(failure, "no"))
+        job = run(w.run_once())
+
+        assert job.state is JobState.QUEUED
+        assert w.stats.retried == 1
+
     def test_an_unexpected_exception_does_not_kill_the_loop(self, queue):
         # A worker that dies on one bad video takes the whole queue with it.
         class Exploding:
@@ -240,6 +282,42 @@ class TestFailure:
 
 
 class TestRunForever:
+    def test_a_redis_failure_does_not_end_the_loop(self, queue, redis):
+        """The worker has to outlive the thing it depends on.
+
+        `claim` sits outside run_once's failure handling, so one dropped Redis
+        connection ended this coroutine for good. The gRPC server kept answering,
+        the instance looked healthy, and jobs waited for a worker that was gone.
+        """
+
+        real_lpop = redis.lpop
+        failures = {"left": 1}
+
+        async def flaky_lpop(key):
+            if failures["left"]:
+                failures["left"] -= 1
+                raise ConnectionError("connection dropped")
+            return await real_lpop(key)
+
+        redis.lpop = flaky_lpop
+
+        async def scenario():
+            await queue.enqueue(VIDEO)
+            stop = asyncio.Event()
+            w = worker(queue)
+
+            async def stop_when_done():
+                for _ in range(200):
+                    if w.stats.succeeded:
+                        break
+                    await asyncio.sleep(0)
+                stop.set()
+
+            await asyncio.wait_for(asyncio.gather(w.run_forever(stop), stop_when_done()), 5)
+            return w
+
+        assert run(scenario()).stats.succeeded == 1
+
     def test_it_stops_when_asked_and_finishes_the_job_in_hand(self, queue):
         async def scenario():
             await queue.enqueue(VIDEO)

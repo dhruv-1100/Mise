@@ -16,7 +16,7 @@ from tests.test_queue import FakeRedis
 
 from app.archive import NullArchive, from_environment, object_key
 from app.metrics import METRIC_NAME, publish_dead_letters
-from app.queue import CACHE_KEY, DLQ_KEY, ExtractionQueue
+from app.queue import CACHE_KEY, CACHE_TTL_SECONDS, DLQ_KEY, ExtractionQueue
 from app.schema import JobState
 
 VIDEO = "aaaaaaaaaaa"
@@ -117,6 +117,30 @@ class TestReadFallthrough:
         assert run(q.cached_recipe(VIDEO))["title"] == "Archived"
         assert archive.reads == [VIDEO]
 
+    def test_pasting_an_expired_recipe_does_not_extract_it_again(self):
+        # What this tier is for. A recipe that aged out of Redis is one GET
+        # away, and the paste path used to skip it and pay Gemini regardless.
+        archive = FakeArchive({VIDEO: RECIPE})
+        q = ExtractionQueue(redis=FakeRedis(), archive=archive)
+
+        job, is_new = run(q.enqueue(VIDEO))
+
+        assert not is_new
+        assert job.cached is True
+        assert job.state is JobState.SUCCEEDED
+        assert archive.reads == [VIDEO]
+
+    def test_a_rewarmed_entry_is_compact_and_keeps_its_unicode(self):
+        redis = FakeRedis()
+        recipe = {"videoId": VIDEO, "title": "वड़ा पाव"}
+        q = ExtractionQueue(redis=redis, archive=FakeArchive({VIDEO: recipe}))
+
+        run(q.cached_recipe(VIDEO))
+
+        key = CACHE_KEY.format(video_id=VIDEO)
+        assert redis.values[key] == '{"videoId":"aaaaaaaaaaa","title":"वड़ा पाव"}'
+        assert redis.ttls[key] == CACHE_TTL_SECONDS
+
     def test_missing_in_both_tiers_is_None(self):
         # The one case that genuinely needs an extraction.
         q = ExtractionQueue(redis=FakeRedis(), archive=FakeArchive())
@@ -175,6 +199,33 @@ class TestWrite:
 
         assert redis.values[CACHE_KEY.format(video_id=VIDEO)]
         assert archive.writes == [VIDEO]
+
+    def test_a_no_recipe_verdict_is_not_archived(self):
+        """The archive keeps facts about videos, not opinions of this pipeline.
+
+        NEGATIVE_CACHE_TTL_SECONDS exists so "no recipe here" stops being served
+        the day the pipeline improves. Archiving the verdict undid that: the read
+        path found it in S3 after every expiry and put it straight back.
+        """
+        redis = FakeRedis()
+        archive = FakeArchive()
+        q = ExtractionQueue(redis=redis, archive=archive)
+        negative = {
+            "status": "insufficient_source_material",
+            "videoId": VIDEO,
+            "reason": "description_is_link_only",
+            "sourcesTried": ["description"],
+        }
+
+        run(q.enqueue(VIDEO))
+        job = run(q.claim())
+        run(q.succeed(job, json.dumps(negative)))
+
+        assert archive.writes == []
+        redis.values.pop(CACHE_KEY.format(video_id=VIDEO))
+        assert run(q.cached_recipe(VIDEO)) is None
+        _, is_new = run(q.enqueue(VIDEO))
+        assert is_new
 
     def test_a_broken_archive_does_not_fail_the_extraction(self):
         """S3 being down must not cost a recipe that was extracted correctly.

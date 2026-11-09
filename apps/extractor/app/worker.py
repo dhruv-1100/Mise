@@ -20,7 +20,7 @@ from app.llm import LlmError, LlmProvider
 from app.pipeline import run_pipeline
 from app.queue import ExtractionQueue, backoff_seconds
 from app.schema import ExtractionOk, Job, JobStage
-from app.youtube import DescriptionFetcher, FetchError
+from app.youtube import DescriptionFetcher, FetchError, FetchFailure
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,15 @@ Sleep = Callable[[float], Awaitable[None]]
 #: that a submitted job starts promptly, long enough not to hammer Redis.
 IDLE_POLL_SECONDS = 1.0
 
+#: How long to wait after the loop itself fails, which in practice means Redis
+#: is unreachable. Long enough not to fill the logs during an outage.
+LOOP_ERROR_BACKOFF_SECONDS = 5.0
+
+#: Fetch failures that are a true statement about the video. Retrying cannot
+#: change them, and they are not incidents. Quota and a rejected API key stay
+#: retryable: those are our failures, and the alarm should hear about them.
+PERMANENT_FETCH_FAILURES = frozenset({FetchFailure.NOT_A_YOUTUBE_URL, FetchFailure.VIDEO_NOT_FOUND})
+
 
 @dataclass
 class WorkerStats:
@@ -37,6 +46,7 @@ class WorkerStats:
     succeeded: int = 0
     insufficient: int = 0
     retried: int = 0
+    rejected: int = 0
     dead_lettered: int = 0
     slept: list[float] = field(default_factory=list)
 
@@ -79,7 +89,12 @@ class Worker:
                 on_stage=on_stage,
             )
         except FetchError as exc:
-            return await self._fail(job, exc.failure.value, exc.detail or str(exc))
+            return await self._fail(
+                job,
+                exc.failure.value,
+                exc.detail or str(exc),
+                permanent=exc.failure in PERMANENT_FETCH_FAILURES,
+            )
         except LlmError as exc:
             return await self._fail(job, "llm_unavailable", str(exc))
         except Exception as exc:
@@ -112,9 +127,12 @@ class Worker:
 
         return await self.queue.succeed(job, recipe_json)
 
-    async def _fail(self, job: Job, code: str, message: str) -> Job:
-        updated, will_retry = await self.queue.fail(job, code, message)
-        if will_retry:
+    async def _fail(self, job: Job, code: str, message: str, *, permanent: bool = False) -> Job:
+        updated, will_retry = await self.queue.fail(job, code, message, permanent=permanent)
+        if permanent:
+            self.stats.rejected += 1
+            logger.info("job %s rejected: %s", job.job_id, code)
+        elif will_retry:
             self.stats.retried += 1
             logger.warning("job %s failed (%s), retrying", job.job_id, code)
         else:
@@ -132,7 +150,15 @@ class Worker:
         watching it waits forever.
         """
         while not stop.is_set():
-            job = await self.run_once()
+            try:
+                job = await self.run_once()
+            except Exception:
+                # run_once handles a bad video; this is the queue itself failing.
+                # Without it one dropped Redis connection ends the worker for
+                # good while gRPC keeps answering and the instance looks healthy.
+                logger.exception("worker loop failed, retrying")
+                await self.sleep(LOOP_ERROR_BACKOFF_SECONDS)
+                continue
             if job is None:
                 await self.sleep(IDLE_POLL_SECONDS)
 
