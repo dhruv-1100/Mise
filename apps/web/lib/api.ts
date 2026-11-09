@@ -1,10 +1,12 @@
 import "server-only";
 
+import { unstable_rethrow } from "next/navigation";
 import { NextResponse } from "next/server";
 import { VideoId } from "@mise/schema";
 
 import { auth } from "@/auth";
 import type { Role } from "@/lib/accounts";
+import { ExtractorError, type ExtractorErrorCode } from "@/lib/extractor";
 
 /**
  * The shared shape of every API response in this app.
@@ -26,6 +28,48 @@ export function envelope(
 ): NextResponse {
   const init: ResponseInit = headers === undefined ? { status } : { status, headers };
   return NextResponse.json<ErrorEnvelope>({ error, detail }, init);
+}
+
+const EXTRACTOR_STATUS: Record<ExtractorErrorCode, number> = {
+  not_a_youtube_url: 400,
+  video_not_found: 404,
+  quota_exceeded: 429,
+  queue_full: 429,
+  unavailable: 503,
+  llm_unavailable: 502,
+  internal_error: 500,
+};
+
+/**
+ * Wrap a route handler so nothing but the envelope can leave it.
+ *
+ * Without this the rule held only on the paths someone remembered: a database
+ * error in any route reached the client as Next's HTML error page, which the
+ * JSON-parsing callers then failed on in turn.
+ */
+export function enveloped<Args extends unknown[]>(
+  handler: (...args: Args) => Promise<Response>,
+): (...args: Args) => Promise<Response> {
+  return async (...args) => {
+    try {
+      return await handler(...args);
+    } catch (error) {
+      // notFound() and redirect() work by throwing. They are not failures.
+      unstable_rethrow(error);
+
+      if (error instanceof ExtractorError) {
+        const status = EXTRACTOR_STATUS[error.code];
+        return error.retryAfterSeconds === undefined
+          ? envelope(error.code, error.message, status)
+          : envelope(error.code, error.message, status, {
+              "Retry-After": String(error.retryAfterSeconds),
+            });
+      }
+
+      console.error("unhandled route error", error);
+      return envelope("internal_error", "Something went wrong on our side.", 500);
+    }
+  };
 }
 
 export const unauthorized = () =>

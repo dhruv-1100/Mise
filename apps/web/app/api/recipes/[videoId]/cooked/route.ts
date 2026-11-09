@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { logCook } from "@/lib/accounts";
-import { parseVideoId, requireUser } from "@/lib/api";
+import { enveloped, parseVideoId, requireUser } from "@/lib/api";
 
 type Params = { params: Promise<{ videoId: string }> };
 
@@ -12,7 +12,7 @@ type Params = { params: Promise<{ videoId: string }> };
  * and the count is the interesting product number (BUILD_PLAN.md §1: "saves per
  * user, cook-mode sessions"). Fired from the end of cook mode.
  */
-export async function POST(_request: Request, { params }: Params): Promise<NextResponse> {
+export const POST = enveloped(async (_request: Request, { params }: Params): Promise<NextResponse> => {
   const caller = await requireUser();
   if (!caller.ok) return caller.response;
   const video = parseVideoId((await params).videoId);
@@ -20,4 +20,4 @@ export async function POST(_request: Request, { params }: Params): Promise<NextR
 
   const cookedCount = await logCook(caller.value.userId, video.value);
   return NextResponse.json({ cookedCount });
-}
+});

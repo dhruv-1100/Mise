@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { VIDEO_ID } from "./fixture";
+import { OUTAGE_VIDEO_ID, VIDEO_ID } from "./fixture";
 
 test.describe("recipe page", () => {
   test.beforeEach(async ({ page }) => {
@@ -97,4 +97,48 @@ test.describe("personal edits, signed out", () => {
     expect(response.status()).toBeGreaterThanOrEqual(400);
     expect(response.status()).toBeLessThan(500);
   });
+});
+
+test.describe("when there is nothing to show", () => {
+  test("an unknown video gets the not-found page and a 404", async ({ page }) => {
+    const response = await page.goto("/r/nosuchvideo");
+
+    expect(response?.status()).toBe(404);
+    await expect(page.getByRole("heading", { name: "We could not find that page" })).toBeVisible();
+    await page.getByRole("link", { name: "Extract a recipe" }).click();
+    await expect(page).toHaveURL("/");
+  });
+
+  test("an extractor outage is not reported as a missing recipe", async ({ page }) => {
+    const response = await page.goto(`/r/${OUTAGE_VIDEO_ID}`);
+
+    // A 404 here tells crawlers a good recipe does not exist.
+    expect(response?.status()).not.toBe(404);
+    await expect(page.getByRole("heading", { name: "We could not load this page" })).toBeVisible();
+
+    // Clicked, because a boundary that renders is not one that hydrated.
+    const reload = page.waitForEvent("load");
+    await page.getByRole("button", { name: "Try again" }).click();
+    await reload;
+    await expect(page.getByRole("heading", { name: "We could not load this page" })).toBeVisible();
+  });
+
+  test("an API call during an outage answers with the envelope", async ({ request }) => {
+    const response = await request.post("/api/extract", { data: { video: "j3pDXY9fqSo" } });
+
+    // The stub implements no Extract, so this is a gRPC failure end to end.
+    expect(response.headers()["content-type"]).toContain("application/json");
+    const body = (await response.json()) as { error: string; detail: string };
+    expect(body.error).toBe("internal_error");
+    expect(body.detail).toEqual(expect.any(String));
+  });
+});
+
+test("every page carries the security headers", async ({ request }) => {
+  const headers = (await request.get(`/r/${VIDEO_ID}`)).headers();
+
+  expect(headers["x-content-type-options"]).toBe("nosniff");
+  expect(headers["x-frame-options"]).toBe("DENY");
+  expect(headers["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+  expect(headers["content-security-policy"]).toContain("frame-ancestors 'none'");
 });

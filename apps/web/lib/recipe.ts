@@ -32,6 +32,11 @@ export type Extraction =
  * not a patch, so there is nothing to merge and no order-of-application
  * question to get wrong. `getOverride` returns null when the database is not
  * configured, so this path is unchanged on a deployment with no accounts.
+ *
+ * Rejects when the extractor cannot be asked. "We could not find out" must not
+ * be reported as "there is no recipe": that told readers and crawlers a good
+ * recipe did not exist for as long as any outage lasted. app/error.tsx renders
+ * the rejection.
  */
 export async function loadExtraction(
   videoId: string,
@@ -55,8 +60,8 @@ export async function loadExtraction(
   const override = await getOverride(videoId).catch(() => null);
   if (override !== null) return { status: "ok", recipe: override };
 
-  const result = await getRecipe(videoId).catch(() => null);
-  if (result === null || !result.found) return { status: "missing" };
+  const result = await getRecipe(videoId);
+  if (!result.found) return { status: "missing" };
 
   let raw: unknown;
   try {
@@ -83,6 +88,27 @@ export async function loadExtraction(
   }
 
   return { status: "missing" };
+}
+
+/**
+ * The extractor's own version of a recipe, ignoring every override and edit.
+ *
+ * Authorisation must be decided against this and never against an override. An
+ * override is a document the creator controls; if an ownership check read
+ * `creator.channelId` out of it, the first edit could rewrite that field to a
+ * channel the editor owns and the second edit would authorise itself.
+ *
+ * Null when there is no recipe. Rejects when the extractor cannot be asked.
+ */
+export async function originalRecipe(videoId: string): Promise<Recipe | null> {
+  const result = await getRecipe(videoId);
+  if (!result.found) return null;
+  try {
+    const parsed = Recipe.safeParse(JSON.parse(result.recipeJson));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

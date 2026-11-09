@@ -15,6 +15,9 @@
  */
 export const VIDEO_ID = "e2etestvid0";
 
+/** The stub answers UNAVAILABLE for this id, standing in for an extractor outage. */
+export const OUTAGE_VIDEO_ID = "outage00000";
+
 export const RECIPE = {
   videoId: VIDEO_ID,
   title: "End-to-end Test Curry",

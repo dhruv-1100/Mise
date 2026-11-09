@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { Recipe } from "@mise/schema";
 
-import { envelope, jsonBody, parseVideoId, requireUser } from "@/lib/api";
-import { getRecipe } from "@/lib/extractor";
+import { envelope, enveloped, jsonBody, parseVideoId, requireUser } from "@/lib/api";
 import { deletePersonalRecipe, savePersonalRecipe } from "@/lib/personal";
+import { originalRecipe } from "@/lib/recipe";
 
 type Params = { params: Promise<{ videoId: string }> };
 
@@ -20,14 +20,7 @@ type Params = { params: Promise<{ videoId: string }> };
  * editor's to change, and a recipe is only editable if it exists.
  */
 
-async function originalRecipe(videoId: string): Promise<Recipe | null> {
-  const result = await getRecipe(videoId).catch(() => null);
-  if (result === null || !result.found) return null;
-  const parsed = Recipe.safeParse(JSON.parse(result.recipeJson));
-  return parsed.success ? parsed.data : null;
-}
-
-export async function PUT(request: Request, { params }: Params): Promise<NextResponse> {
+export const PUT = enveloped(async (request: Request, { params }: Params): Promise<NextResponse> => {
   const caller = await requireUser();
   if (!caller.ok) return caller.response;
   const video = parseVideoId((await params).videoId);
@@ -63,10 +56,10 @@ export async function PUT(request: Request, { params }: Params): Promise<NextRes
 
   await savePersonalRecipe(caller.value.userId, video.value, recipe);
   return NextResponse.json({ ok: true, personal: true });
-}
+});
 
 /** Revert to the creator's version, or the extractor's. */
-export async function DELETE(_request: Request, { params }: Params): Promise<NextResponse> {
+export const DELETE = enveloped(async (_request: Request, { params }: Params): Promise<NextResponse> => {
   const caller = await requireUser();
   if (!caller.ok) return caller.response;
   const video = parseVideoId((await params).videoId);
@@ -74,4 +67,4 @@ export async function DELETE(_request: Request, { params }: Params): Promise<Nex
 
   await deletePersonalRecipe(caller.value.userId, video.value);
   return NextResponse.json({ ok: true, personal: false });
-}
+});

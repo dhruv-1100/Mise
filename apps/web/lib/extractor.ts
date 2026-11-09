@@ -15,10 +15,12 @@ import "server-only";
 import { isLoopback } from "@/lib/grpc-address";
 
 import {
+  type CallOptions,
   ChannelCredentials,
   Client,
   type ClientReadableStream,
   makeGenericClientConstructor,
+  Metadata,
   type ServiceDefinition,
   type ServiceError,
 } from "@grpc/grpc-js";
@@ -35,6 +37,18 @@ export type { ExtractResponse };
 export { Job, JobStage, JobState };
 
 const ADDRESS = process.env.EXTRACTOR_GRPC_ADDRESS ?? "127.0.0.1:50051";
+
+/**
+ * How long a unary call may take, cold start included.
+ *
+ * Without one, a hung extractor holds the page open until the platform kills
+ * the function, and the person watching it gets nothing to act on.
+ */
+const UNARY_DEADLINE_MS = 30_000;
+
+function unaryOptions(): CallOptions {
+  return { deadline: Date.now() + UNARY_DEADLINE_MS };
+}
 
 /** Codes the extractor uses, mirrored from its HTTP error envelope. */
 export type ExtractorErrorCode =
@@ -67,6 +81,8 @@ function toExtractorError(error: ServiceError): ExtractorError {
   switch (error.code) {
     case 3: // INVALID_ARGUMENT
       return new ExtractorError("not_a_youtube_url", error.details);
+    case 4: // DEADLINE_EXCEEDED — our deadline, usually a very slow cold start
+      return new ExtractorError("unavailable", error.details);
     case 5: // NOT_FOUND
       return new ExtractorError("video_not_found", error.details);
     case 8: // RESOURCE_EXHAUSTED — the extractor's backpressure
@@ -85,14 +101,20 @@ function toExtractorError(error: ServiceError): ExtractorError {
 interface ExtractorClient extends Client {
   extract(
     request: { video: string },
+    metadata: Metadata,
+    options: CallOptions,
     callback: (err: ServiceError | null, res: ExtractResponse) => void,
   ): void;
   getStatus(
     request: { jobId: string },
+    metadata: Metadata,
+    options: CallOptions,
     callback: (err: ServiceError | null, res: Job) => void,
   ): void;
   getRecipe(
     request: { videoId: string },
+    metadata: Metadata,
+    options: CallOptions,
     callback: (err: ServiceError | null, res: { recipeJson: string; found: boolean }) => void,
   ): void;
   streamStatus(request: { jobId: string }): ClientReadableStream<Job>;
@@ -161,7 +183,7 @@ function client(): ExtractorClient {
 
 export function extract(video: string): Promise<ExtractResponse> {
   return new Promise((resolve, reject) => {
-    client().extract({ video }, (err, res) =>
+    client().extract({ video }, new Metadata(), unaryOptions(), (err, res) =>
       err ? reject(toExtractorError(err)) : resolve(res),
     );
   });
@@ -169,7 +191,7 @@ export function extract(video: string): Promise<ExtractResponse> {
 
 export function getStatus(jobId: string): Promise<Job> {
   return new Promise((resolve, reject) => {
-    client().getStatus({ jobId }, (err, res) =>
+    client().getStatus({ jobId }, new Metadata(), unaryOptions(), (err, res) =>
       err ? reject(toExtractorError(err)) : resolve(res),
     );
   });
@@ -183,7 +205,7 @@ export function getStatus(jobId: string): Promise<Job> {
  */
 export function getRecipe(videoId: string): Promise<{ recipeJson: string; found: boolean }> {
   return new Promise((resolve, reject) => {
-    client().getRecipe({ videoId }, (err, res) =>
+    client().getRecipe({ videoId }, new Metadata(), unaryOptions(), (err, res) =>
       err ? reject(toExtractorError(err)) : resolve(res),
     );
   });

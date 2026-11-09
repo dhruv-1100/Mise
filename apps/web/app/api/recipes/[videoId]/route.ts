@@ -2,26 +2,11 @@ import { NextResponse } from "next/server";
 import { type Creator, Recipe } from "@mise/schema";
 
 import { canEditChannel } from "@/lib/accounts";
-import { envelope, forbidden, jsonBody, parseVideoId, requireUser } from "@/lib/api";
-import { getRecipe } from "@/lib/extractor";
+import { envelope, enveloped, forbidden, jsonBody, parseVideoId, requireUser } from "@/lib/api";
 import { deleteOverride, getTrustedOwner, putOverride } from "@/lib/overrides";
+import { originalRecipe } from "@/lib/recipe";
 
 type Params = { params: Promise<{ videoId: string }> };
-
-/**
- * The extractor's own version of a recipe, ignoring any override.
- *
- * Authorisation must be decided against this and never against the override.
- * An override is a document the creator controls; if the ownership check read
- * `creator.channelId` out of it, the first edit could rewrite that field to a
- * channel the editor owns and the second edit would authorise itself.
- */
-async function originalRecipe(videoId: string): Promise<Recipe | null> {
-  const result = await getRecipe(videoId).catch(() => null);
-  if (result === null || !result.found) return null;
-  const parsed = Recipe.safeParse(JSON.parse(result.recipeJson));
-  return parsed.success ? parsed.data : null;
-}
 
 interface Subject {
   channelId: string;
@@ -68,7 +53,7 @@ async function subject(videoId: string): Promise<Subject | null> {
  * channel this specific video belongs to — and that is the only question whose
  * answer is safe to act on.
  */
-export async function PUT(request: Request, { params }: Params): Promise<NextResponse> {
+export const PUT = enveloped(async (request: Request, { params }: Params): Promise<NextResponse> => {
   const caller = await requireUser();
   if (!caller.ok) return caller.response;
   const video = parseVideoId((await params).videoId);
@@ -115,10 +100,10 @@ export async function PUT(request: Request, { params }: Params): Promise<NextRes
 
   await putOverride(video.value, recipe, caller.value.userId, owner.channelId);
   return NextResponse.json({ recipe });
-}
+});
 
 /** Revert to the extractor's version. */
-export async function DELETE(_request: Request, { params }: Params): Promise<NextResponse> {
+export const DELETE = enveloped(async (_request: Request, { params }: Params): Promise<NextResponse> => {
   const caller = await requireUser();
   if (!caller.ok) return caller.response;
   const video = parseVideoId((await params).videoId);
@@ -134,4 +119,4 @@ export async function DELETE(_request: Request, { params }: Params): Promise<Nex
 
   await deleteOverride(video.value);
   return NextResponse.json({ reverted: true });
-}
+});

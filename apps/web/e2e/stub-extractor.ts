@@ -2,7 +2,7 @@ import { Server, ServerCredentials, type ServiceDefinition } from "@grpc/grpc-js
 
 import { ExtractorDefinition } from "@mise/schema/gen/extractor";
 
-import { RECIPE, VIDEO_ID } from "./fixture";
+import { OUTAGE_VIDEO_ID, RECIPE, VIDEO_ID } from "./fixture";
 
 /**
  * A gRPC extractor that serves one canned recipe.
@@ -52,6 +52,10 @@ export async function startStubExtractor(port: number): Promise<Server> {
 
   const impl: Record<string, Handler> = {
     getRecipe: (call, cb) => {
+      if (call.request.videoId === OUTAGE_VIDEO_ID) {
+        cb({ code: 14, details: "stubbed outage" });
+        return;
+      }
       const found = call.request.videoId === VIDEO_ID;
       cb(null, { recipeJson: found ? JSON.stringify(RECIPE) : "", found });
     },
