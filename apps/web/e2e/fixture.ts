@@ -18,6 +18,9 @@ export const VIDEO_ID = "e2etestvid0";
 /** The stub answers UNAVAILABLE for this id, standing in for an extractor outage. */
 export const OUTAGE_VIDEO_ID = "outage00000";
 
+/** What the BFF must present on Extract. Set on the server in playwright.config.ts. */
+export const EXTRACT_TOKEN = "e2e-extract-token";
+
 export const RECIPE = {
   videoId: VIDEO_ID,
   title: "End-to-end Test Curry",

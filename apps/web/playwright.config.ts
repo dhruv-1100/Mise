@@ -16,6 +16,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 import { STUB_PORT } from "./e2e/ports";
 
+import { EXTRACT_TOKEN } from "./e2e/fixture";
+
 export default defineConfig({
   testDir: "./e2e",
   // The stub is a module the specs' setup imports, not a spec itself.
@@ -53,6 +55,7 @@ export default defineConfig({
     timeout: 180_000,
     env: {
       EXTRACTOR_GRPC_ADDRESS: `127.0.0.1:${STUB_PORT}`,
+      EXTRACT_TOKEN,
       NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3100",
       // Deliberately no DATABASE_URL or AUTH_*: the specs cover the signed-out
       // public surface, and the app degrading cleanly to "signed out" when

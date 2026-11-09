@@ -15,7 +15,7 @@ from tests.test_queue import FakeRedis
 
 from app.gen import extractor_pb2 as pb
 from app.gen import extractor_pb2_grpc as pb_grpc
-from app.grpc_server import ExtractorService, to_proto
+from app.grpc_server import EXTRACT_TOKEN_HEADER, ExtractorService, to_proto
 from app.queue import QUEUE_KEY, ExtractionQueue
 from app.schema import JobState
 
@@ -29,12 +29,14 @@ def run(coro):
 class Harness:
     """Real server on an ephemeral port, real client channel."""
 
-    def __init__(self, queue: ExtractionQueue):
+    def __init__(self, queue: ExtractionQueue, extract_token: str | None = None):
         self.queue = queue
+        self.extract_token = extract_token
 
     async def __aenter__(self):
         self.server = grpc.aio.server()
-        pb_grpc.add_ExtractorServicer_to_server(ExtractorService(self.queue), self.server)
+        service = ExtractorService(self.queue, extract_token=self.extract_token)
+        pb_grpc.add_ExtractorServicer_to_server(service, self.server)
         self.port = self.server.add_insecure_port("127.0.0.1:0")
         await self.server.start()
         self.channel = grpc.aio.insecure_channel(f"127.0.0.1:{self.port}")
@@ -47,6 +49,66 @@ class Harness:
 
 def fresh() -> ExtractionQueue:
     return ExtractionQueue(redis=FakeRedis())
+
+
+class TestExtractToken:
+    """The one RPC that spends money is the one that needs a caller.
+
+    The service is public on Cloud Run, so this is what stops anyone on the
+    internet queueing work against the Gemini key. The read RPCs stay open on
+    purpose: they cost nothing, and it keeps the canary keyless.
+    """
+
+    TOKEN = "a-long-shared-secret"
+    URL = "https://youtu.be/" + VIDEO
+
+    def _attempt(self, metadata):
+        async def scenario():
+            q = fresh()
+            async with Harness(q, extract_token=self.TOKEN) as stub:
+                try:
+                    await stub.Extract(pb.ExtractRequest(video=self.URL), metadata=metadata)
+                except grpc.aio.AioRpcError as err:
+                    return err.code(), await q.depth()
+                return grpc.StatusCode.OK, await q.depth()
+
+        return run(scenario())
+
+    def test_the_header_is_the_one_the_bff_sends(self):
+        # Spelled out, because apps/web/lib/extractor.ts spells it out too and
+        # e2e/stub-extractor.ts checks that side.
+        assert EXTRACT_TOKEN_HEADER == "x-mise-extract-token"
+
+    def test_no_token_is_refused_before_any_work_is_queued(self):
+        assert self._attempt(()) == (grpc.StatusCode.UNAUTHENTICATED, 0)
+
+    def test_a_wrong_token_is_refused(self):
+        metadata = ((EXTRACT_TOKEN_HEADER, "wrong"),)
+        assert self._attempt(metadata) == (grpc.StatusCode.UNAUTHENTICATED, 0)
+
+    def test_the_right_token_is_accepted(self):
+        metadata = ((EXTRACT_TOKEN_HEADER, self.TOKEN),)
+        assert self._attempt(metadata) == (grpc.StatusCode.OK, 1)
+
+    def test_reading_needs_no_token(self):
+        async def scenario():
+            async with Harness(fresh(), extract_token=self.TOKEN) as stub:
+                return await stub.GetRecipe(pb.GetRecipeRequest(video_id=VIDEO))
+
+        assert run(scenario()).found is False
+
+    def test_the_daily_limit_has_its_own_answer(self):
+        # The BFF tells "come back tomorrow" apart from "try again shortly" by
+        # this exact string.
+        async def scenario():
+            q = ExtractionQueue(redis=FakeRedis(), daily_limit=0)
+            async with Harness(q) as stub:
+                try:
+                    await stub.Extract(pb.ExtractRequest(video=self.URL))
+                except grpc.aio.AioRpcError as err:
+                    return err.code(), err.details()
+
+        assert run(scenario()) == (grpc.StatusCode.RESOURCE_EXHAUSTED, "daily_limit_reached")
 
 
 class TestExtract:

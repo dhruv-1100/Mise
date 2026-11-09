@@ -56,6 +56,20 @@ variable "youtube_api_key" {
   sensitive   = true
 }
 
+variable "extract_token" {
+  description = "Shared secret the BFF presents on the extractor's Extract RPC. Generate with: openssl rand -hex 32"
+  type        = string
+  sensitive   = true
+
+  // No default, unlike the Vercel secrets below. An empty value here would
+  // either refuse to boot or leave the paid RPC open, and neither should be
+  // something a lost shell export can do quietly.
+  validation {
+    condition     = length(var.extract_token) >= 32
+    error_message = "extract_token must be at least 32 characters. Generate one with: openssl rand -hex 32"
+  }
+}
+
 variable "gemini_api_key" {
   description = "Gemini API key, passed to the Cloud Run service."
   type        = string

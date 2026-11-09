@@ -124,13 +124,21 @@ test.describe("when there is nothing to show", () => {
   });
 
   test("an API call during an outage answers with the envelope", async ({ request }) => {
-    const response = await request.post("/api/extract", { data: { video: "j3pDXY9fqSo" } });
+    const response = await request.post("/api/extract", { data: { video: OUTAGE_VIDEO_ID } });
 
-    // The stub implements no Extract, so this is a gRPC failure end to end.
+    expect(response.status()).toBe(503);
     expect(response.headers()["content-type"]).toContain("application/json");
     const body = (await response.json()) as { error: string; detail: string };
-    expect(body.error).toBe("internal_error");
+    expect(body.error).toBe("unavailable");
     expect(body.detail).toEqual(expect.any(String));
+  });
+
+  test("the BFF presents the extract token", async ({ request }) => {
+    // The stub refuses a missing or wrong token, as the real extractor does.
+    const response = await request.post("/api/extract", { data: { video: VIDEO_ID } });
+
+    expect(response.status()).toBe(200);
+    expect(((await response.json()) as { created: boolean }).created).toBe(true);
   });
 });
 

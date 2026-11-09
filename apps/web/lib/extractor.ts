@@ -46,6 +46,9 @@ const ADDRESS = process.env.EXTRACTOR_GRPC_ADDRESS ?? "127.0.0.1:50051";
  */
 const UNARY_DEADLINE_MS = 30_000;
 
+/** Proves to the extractor that this is the BFF. See infra/variables.tf. */
+const EXTRACT_TOKEN = process.env.EXTRACT_TOKEN;
+
 function unaryOptions(): CallOptions {
   return { deadline: Date.now() + UNARY_DEADLINE_MS };
 }
@@ -56,6 +59,7 @@ export type ExtractorErrorCode =
   | "video_not_found"
   | "quota_exceeded"
   | "queue_full"
+  | "daily_limit_reached"
   | "llm_unavailable"
   | "unavailable"
   | "internal_error";
@@ -85,8 +89,10 @@ function toExtractorError(error: ServiceError): ExtractorError {
       return new ExtractorError("unavailable", error.details);
     case 5: // NOT_FOUND
       return new ExtractorError("video_not_found", error.details);
-    case 8: // RESOURCE_EXHAUSTED — the extractor's backpressure
-      return new ExtractorError("queue_full", error.details, 30);
+    case 8: // RESOURCE_EXHAUSTED — the extractor's backpressure or daily budget
+      return error.details === "daily_limit_reached"
+        ? new ExtractorError("daily_limit_reached", error.details, 3600)
+        : new ExtractorError("queue_full", error.details, 30);
     case 14: // UNAVAILABLE — service down, or a cold start that timed out
       return new ExtractorError("unavailable", error.details);
     default:
@@ -182,8 +188,11 @@ function client(): ExtractorClient {
 }
 
 export function extract(video: string): Promise<ExtractResponse> {
+  const metadata = new Metadata();
+  if (EXTRACT_TOKEN !== undefined) metadata.set("x-mise-extract-token", EXTRACT_TOKEN);
+
   return new Promise((resolve, reject) => {
-    client().extract({ video }, new Metadata(), unaryOptions(), (err, res) =>
+    client().extract({ video }, metadata, unaryOptions(), (err, res) =>
       err ? reject(toExtractorError(err)) : resolve(res),
     );
   });

@@ -57,6 +57,11 @@ else
   export TF_VAR_gemini_api_key="$(_mise_run GEMINI_API_KEY)"
   export TF_VAR_neon_org_id="$(jq -r '.resources[]|select(.type=="neon_project")|.instances[].attributes.org_id // empty' "$_mise_state" 2>/dev/null)"
 
+  # Only once it has been applied. Exported empty, it would overwrite a value
+  # you had just generated for the first apply.
+  _mise_token="$(_mise_run EXTRACT_TOKEN)"
+  if [ -n "$_mise_token" ]; then export TF_VAR_extract_token="$_mise_token"; fi
+
   # The SNS subscription endpoint, once one exists. Added after the recovery
   # apply created the alarm and the topic but not the subscription: the shell
   # holding TF_VAR_alert_email had been lost, and `count = var.alert_email == ""
@@ -83,6 +88,11 @@ else
   printf '  %-36s %d chars\n' TF_VAR_gemini_api_key              "${#TF_VAR_gemini_api_key}"
   printf '  %-36s %d chars\n' TF_VAR_neon_org_id                 "${#TF_VAR_neon_org_id}"
   printf '  %-36s %d chars\n' TF_VAR_gcp_project_id              "${#TF_VAR_gcp_project_id}"
+  if [ -n "$_mise_token" ]; then
+    printf '  %-36s %d chars\n' TF_VAR_extract_token             "${#_mise_token}"
+  else
+    echo "  TF_VAR_extract_token                 not in state yet — generate one: openssl rand -hex 32"
+  fi
   if [ -n "$_mise_alert" ]; then
     printf '  %-36s %d chars\n' TF_VAR_alert_email               "${#_mise_alert}"
   else
@@ -92,4 +102,4 @@ else
 
   unset -f _mise_vercel _mise_run
 fi
-unset _d _mise_state _mise_alert
+unset _d _mise_state _mise_alert _mise_token

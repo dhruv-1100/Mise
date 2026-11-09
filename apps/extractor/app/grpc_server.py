@@ -13,13 +13,14 @@ what makes the third representation cheap rather than a third thing to drift.
 from __future__ import annotations
 
 import asyncio
+import hmac
 import logging
 
 import grpc
 
 from app.gen import extractor_pb2 as pb
 from app.gen import extractor_pb2_grpc as pb_grpc
-from app.queue import ExtractionQueue, QueueFull
+from app.queue import DailyLimitReached, ExtractionQueue, QueueFull
 from app.schema import Job, JobStage, JobState
 from app.youtube import FetchError, parse_video_id
 
@@ -85,12 +86,38 @@ def is_terminal(job: Job) -> bool:
     return job.state in (JobState.SUCCEEDED, JobState.FAILED)
 
 
+#: Metadata key the BFF presents the shared token under. gRPC requires lowercase.
+EXTRACT_TOKEN_HEADER = "x-mise-extract-token"
+
+
 class ExtractorService(pb_grpc.ExtractorServicer):
-    def __init__(self, queue: ExtractionQueue, version: str = "0.0.0") -> None:
+    def __init__(
+        self,
+        queue: ExtractionQueue,
+        version: str = "0.0.0",
+        extract_token: str | None = None,
+    ) -> None:
         self._queue = queue
         self._version = version
+        self._extract_token = extract_token
+
+    async def _authorise_extract(self, context) -> None:
+        """Refuse a caller without the shared token.
+
+        Extract only. It is the one RPC that spends money, and leaving the reads
+        open is what lets the canary and the deploy smoke test run with no
+        secret at all. app/server.py refuses to boot without a token, so None
+        only ever means a test or a local server.
+        """
+        if self._extract_token is None:
+            return
+        presented = dict(context.invocation_metadata() or ()).get(EXTRACT_TOKEN_HEADER, "")
+        if not hmac.compare_digest(presented.encode(), self._extract_token.encode()):
+            await context.abort(grpc.StatusCode.UNAUTHENTICATED, "invalid extract token")
 
     async def Extract(self, request: pb.ExtractRequest, context) -> pb.ExtractResponse:
+        await self._authorise_extract(context)
+
         try:
             video_id = parse_video_id(request.video)
         except FetchError as exc:
@@ -105,6 +132,8 @@ class ExtractorService(pb_grpc.ExtractorServicer):
                 grpc.StatusCode.RESOURCE_EXHAUSTED,
                 f"queue at capacity ({exc.depth}); retry in {exc.retry_after_seconds}s",
             )
+        except DailyLimitReached:
+            await context.abort(grpc.StatusCode.RESOURCE_EXHAUSTED, "daily_limit_reached")
 
         recipe = "" if not job.cached else await self._recipe_json(job.video_id)
         return pb.ExtractResponse(job=to_proto(job, recipe), created=created)
@@ -180,9 +209,11 @@ async def serve(
     queue: ExtractionQueue,
     port: int = 50051,
     host: str = DEFAULT_BIND_HOST,
+    extract_token: str | None = None,
 ) -> grpc.aio.Server:
     server = grpc.aio.server()
-    pb_grpc.add_ExtractorServicer_to_server(ExtractorService(queue), server)
+    service = ExtractorService(queue, extract_token=extract_token)
+    pb_grpc.add_ExtractorServicer_to_server(service, server)
 
     # grpcio raises RuntimeError("Failed to bind to address ...") here on a
     # failed bind — checked, not assumed, because its documented contract is a

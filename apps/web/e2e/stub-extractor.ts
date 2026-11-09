@@ -1,8 +1,8 @@
 import { Server, ServerCredentials, type ServiceDefinition } from "@grpc/grpc-js";
 
-import { ExtractorDefinition } from "@mise/schema/gen/extractor";
+import { ExtractorDefinition, ExtractResponse } from "@mise/schema/gen/extractor";
 
-import { OUTAGE_VIDEO_ID, RECIPE, VIDEO_ID } from "./fixture";
+import { EXTRACT_TOKEN, OUTAGE_VIDEO_ID, RECIPE, VIDEO_ID } from "./fixture";
 
 /**
  * A gRPC extractor that serves one canned recipe.
@@ -45,7 +45,13 @@ function toServiceDefinition(): ServiceDefinition {
   return definition as ServiceDefinition;
 }
 
-type Handler = (call: { request: Record<string, string> }, cb: (e: unknown, r?: unknown) => void) => void;
+type Handler = (
+  call: {
+    request: Record<string, string>;
+    metadata: { get(key: string): unknown[] };
+  },
+  cb: (e: unknown, r?: unknown) => void,
+) => void;
 
 export async function startStubExtractor(port: number): Promise<Server> {
   const server = new Server();
@@ -58,6 +64,21 @@ export async function startStubExtractor(port: number): Promise<Server> {
       }
       const found = call.request.videoId === VIDEO_ID;
       cb(null, { recipeJson: found ? JSON.stringify(RECIPE) : "", found });
+    },
+    extract: (call, cb) => {
+      if (call.metadata.get("x-mise-extract-token")[0] !== EXTRACT_TOKEN) {
+        cb({ code: 16, details: "invalid extract token" });
+      } else if (call.request.video === OUTAGE_VIDEO_ID) {
+        cb({ code: 14, details: "stubbed outage" });
+      } else {
+        cb(
+          null,
+          ExtractResponse.fromPartial({
+            job: { jobId: "e2e-job", videoId: call.request.video ?? "" },
+            created: true,
+          }),
+        );
+      }
     },
     health: (_call, cb) => cb(null, { status: "ok", service: "stub", version: "0.0.0" }),
   };

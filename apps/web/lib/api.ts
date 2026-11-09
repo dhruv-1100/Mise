@@ -35,6 +35,7 @@ const EXTRACTOR_STATUS: Record<ExtractorErrorCode, number> = {
   video_not_found: 404,
   quota_exceeded: 429,
   queue_full: 429,
+  daily_limit_reached: 429,
   unavailable: 503,
   llm_unavailable: 502,
   internal_error: 500,

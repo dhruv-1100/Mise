@@ -40,11 +40,19 @@ logger = logging.getLogger(__name__)
 JOB_KEY = "mise:job:{job_id}"
 VIDEO_KEY = "mise:video:{video_id}"
 CACHE_KEY = "mise:cache:{video_id}"
+BUDGET_KEY = "mise:budget:{day}"
 
 #: Above this, reject rather than accept work we cannot get to.
 MAX_QUEUE_DEPTH = 100
 #: Attempts before a job is dead-lettered.
 MAX_ATTEMPTS = 3
+#: New extractions accepted per UTC day.
+#:
+#: The token on Extract stops strangers calling the service directly. It does
+#: nothing about the public form in front of it, and each new video can cost two
+#: Gemini calls. Generous for one person cooking, and a hard ceiling on what a
+#: script hammering the form can spend.
+DAILY_EXTRACTION_LIMIT = 100
 #: Extracted recipes are cached for a week; a description rarely changes.
 CACHE_TTL_SECONDS = 7 * 24 * 3600
 #: "No recipe here" is cached for hours, not a week.
@@ -78,6 +86,10 @@ class QueueFull(RuntimeError):
         self.retry_after_seconds = retry_after_seconds
 
 
+class DailyLimitReached(RuntimeError):
+    """The day's budget of new extractions is spent."""
+
+
 class RedisLike(Protocol):
     """The subset of Redis this module uses."""
 
@@ -87,6 +99,8 @@ class RedisLike(Protocol):
     async def llen(self, key: str) -> int: ...
     async def rpush(self, key: str, value: str) -> Any: ...
     async def lpop(self, key: str) -> str | None: ...
+    async def incr(self, key: str) -> int: ...
+    async def expire(self, key: str, seconds: int) -> Any: ...
 
 
 def _now() -> datetime:
@@ -133,6 +147,7 @@ class ExtractionQueue:
     redis: RedisLike
     max_depth: int = MAX_QUEUE_DEPTH
     max_attempts: int = MAX_ATTEMPTS
+    daily_limit: int = DAILY_EXTRACTION_LIMIT
 
     #: Durable storage under the cache. Defaults to a no-op, so a deployment
     #: without AWS behaves exactly as it did before this existed — and so every
@@ -181,6 +196,14 @@ class ExtractionQueue:
         depth = await self.redis.llen(QUEUE_KEY)
         if depth >= self.max_depth:
             raise QueueFull(depth)
+
+        # Last, so only work that would really start spends the budget. Retries
+        # and reclaimed jobs never reach this line.
+        budget_key = BUDGET_KEY.format(day=_now().date().isoformat())
+        spent = await self.redis.incr(budget_key)
+        await self.redis.expire(budget_key, 48 * 3600)
+        if spent > self.daily_limit:
+            raise DailyLimitReached
 
         job = Job(
             job_id=_new_job_id(),

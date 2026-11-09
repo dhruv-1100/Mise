@@ -93,6 +93,7 @@ async def main() -> None:
     youtube_key = _require("YOUTUBE_API_KEY")
     gemini_key = _require("GEMINI_API_KEY")
     redis_url = _require("REDIS_URL")
+    extract_token = _require("EXTRACT_TOKEN")
 
     from redis.asyncio import from_url
 
@@ -123,7 +124,7 @@ async def main() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
 
-    server = await serve(queue, port=port)
+    server = await serve(queue, port=port, extract_token=extract_token)
     logger.info("extractor up: gRPC on :%d, %d worker(s)", port, pool_size)
 
     metrics = asyncio.create_task(publish_dead_letters(source=queue, sink=sink, stop=stop))

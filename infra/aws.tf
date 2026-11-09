@@ -130,13 +130,29 @@ data "aws_iam_policy_document" "extractor_trust" {
 }
 
 data "aws_iam_policy_document" "recipes_access" {
-  // Read and write recipe objects, and nothing else. No ListBucket, no
-  // DeleteObject: the service has no reason to enumerate the archive or remove
-  // anything from it, and versioning already covers overwrite mistakes.
+  // Read and write recipe objects, and nothing else. No DeleteObject: the
+  // service has no reason to remove anything from the archive, and versioning
+  // already covers overwrite mistakes.
   statement {
     effect    = "Allow"
     actions   = ["s3:GetObject", "s3:PutObject"]
     resources = ["${aws_s3_bucket.recipes.arn}/recipes/*"]
+  }
+
+  // Here so a missing object is a 404. Without ListBucket S3 answers 403 instead,
+  // which made every ordinary archive miss log AccessDenied and left a real
+  // permissions failure looking exactly like the canary's daily probe.
+  //
+  // IfExists because a GetObject carries no s3:prefix for the condition to read.
+  statement {
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.recipes.arn]
+    condition {
+      test     = "StringLikeIfExists"
+      variable = "s3:prefix"
+      values   = ["recipes/*"]
+    }
   }
 
   // One metric, one namespace. PutMetricData cannot be scoped to a metric name,
@@ -205,6 +221,27 @@ resource "aws_cloudwatch_metric_alarm" "dead_letters" {
   // notBreaching is the only correct setting for a metric that legitimately
   // stops being reported.
   treat_missing_data = "notBreaching"
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+  ok_actions    = [aws_sns_topic.alerts.arn]
+}
+
+// The alarm above treats no data as fine, so a publisher that cannot reach AWS
+// would trip nothing. The canary wakes the service every day and the gauge
+// publishes at boot, so a silent gauge now means something is wrong. Two daily
+// periods, because the scheduled canary has run as much as ten hours late.
+resource "aws_cloudwatch_metric_alarm" "dead_letter_gauge_silent" {
+  alarm_name        = "${local.name}-dead-letter-gauge-silent"
+  alarm_description = "DeadLetterDepth has stopped arriving. Federation to AWS is probably failing, which also stops recipes reaching S3. Run scripts/verify_aws.py."
+
+  namespace           = local.cloudwatch_namespace
+  metric_name         = "DeadLetterDepth"
+  statistic           = "SampleCount"
+  period              = 86400
+  evaluation_periods  = 2
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
 
   alarm_actions = [aws_sns_topic.alerts.arn]
   ok_actions    = [aws_sns_topic.alerts.arn]

@@ -77,11 +77,13 @@ class TestConfig:
         with pytest.raises(server.MissingConfig):
             server._require("MISE_EMPTY")
 
-    @pytest.mark.parametrize("missing", ["YOUTUBE_API_KEY", "GEMINI_API_KEY", "REDIS_URL"])
+    @pytest.mark.parametrize(
+        "missing", ["YOUTUBE_API_KEY", "GEMINI_API_KEY", "REDIS_URL", "EXTRACT_TOKEN"]
+    )
     def test_the_service_refuses_to_boot_without_its_credentials(self, monkeypatch, missing):
         # Booting healthy and failing every extraction is worse than refusing to
         # boot: the first looks fine on a dashboard.
-        for name in ("YOUTUBE_API_KEY", "GEMINI_API_KEY", "REDIS_URL"):
+        for name in ("YOUTUBE_API_KEY", "GEMINI_API_KEY", "REDIS_URL", "EXTRACT_TOKEN"):
             monkeypatch.setenv(name, "set")
         monkeypatch.delenv(missing)
 
@@ -133,6 +135,7 @@ class TestBoot:
         monkeypatch.setenv("YOUTUBE_API_KEY", "key")
         monkeypatch.setenv("GEMINI_API_KEY", "key")
         monkeypatch.setenv("REDIS_URL", "redis://localhost:6379")
+        monkeypatch.setenv("EXTRACT_TOKEN", "token")
         monkeypatch.setenv("PORT", str(port))
         monkeypatch.setenv("WORKER_POOL_SIZE", "1")
 

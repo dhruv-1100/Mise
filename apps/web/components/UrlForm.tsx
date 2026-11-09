@@ -11,6 +11,8 @@ const MESSAGES: Record<string, string> = {
   video_not_found: "We could not find that video. It may be private or removed.",
   quota_exceeded: "We are over today's YouTube quota. It resets at midnight Pacific.",
   queue_full: "We are busy right now. Your place is not lost — try again shortly.",
+  daily_limit_reached:
+    "We have reached today's limit for new videos. Recipes we already have still work.",
   unavailable: "The extraction service is not responding. Try again in a moment.",
   bad_request: "Paste a YouTube link to get started.",
 };

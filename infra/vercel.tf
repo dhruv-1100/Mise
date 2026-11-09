@@ -37,6 +37,7 @@ locals {
     )
     EXTRACTOR_GRPC_ADDRESS = "${replace(google_cloud_run_v2_service.extractor.uri, "https://", "")}:443"
     AUTH_TRUST_HOST        = "true"
+    EXTRACT_TOKEN          = var.extract_token
 
     AUTH_SECRET             = var.auth_secret
     AUTH_GOOGLE_ID          = var.google_oauth_client_id
@@ -58,6 +59,7 @@ locals {
     "DATABASE_URL",
     "EXTRACTOR_GRPC_ADDRESS",
     "AUTH_TRUST_HOST",
+    "EXTRACT_TOKEN",
     nonsensitive(var.auth_secret != "") ? "AUTH_SECRET" : "",
     var.google_oauth_client_id != "" ? "AUTH_GOOGLE_ID" : "",
     nonsensitive(var.google_oauth_client_secret != "") ? "AUTH_GOOGLE_SECRET" : "",

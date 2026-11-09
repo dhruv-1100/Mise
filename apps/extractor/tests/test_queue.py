@@ -18,6 +18,7 @@ from app.queue import (
     JOB_LEASE_SECONDS,
     NEGATIVE_CACHE_TTL_SECONDS,
     QUEUE_KEY,
+    DailyLimitReached,
     ExtractionQueue,
     QueueFull,
     backoff_seconds,
@@ -63,6 +64,13 @@ class FakeRedis:
     async def lpop(self, key):
         items = self.lists.get(key, [])
         return items.pop(0) if items else None
+
+    async def incr(self, key):
+        self.values[key] = str(int(self.values.get(key, "0")) + 1)
+        return int(self.values[key])
+
+    async def expire(self, key, seconds):
+        self.ttls[key] = seconds
 
 
 @pytest.fixture
@@ -240,6 +248,57 @@ class TestSuccess:
         assert run(queue.cached_recipe(VIDEO))["reason"] == "description_is_link_only"
 
 
+class TestDailyLimit:
+    """A public form in front of a paid API needs a ceiling that cannot be argued with."""
+
+    def test_new_work_past_the_limit_is_refused(self, redis):
+        q = ExtractionQueue(redis=redis, daily_limit=1)
+        run(q.enqueue(VIDEO))
+
+        with pytest.raises(DailyLimitReached):
+            run(q.enqueue(OTHER))
+
+        assert run(q.depth()) == 1
+
+    def test_a_cached_recipe_does_not_count(self, redis):
+        q = ExtractionQueue(redis=redis, daily_limit=1)
+        run(q.enqueue(VIDEO))
+        job = run(q.claim())
+        run(q.succeed(job, json.dumps({"videoId": VIDEO, "title": "T"})))
+
+        again, is_new = run(q.enqueue(VIDEO))
+
+        assert again.cached is True
+        assert not is_new
+
+    def test_resubmitting_work_in_flight_does_not_count(self, redis):
+        q = ExtractionQueue(redis=redis, daily_limit=1)
+        first, _ = run(q.enqueue(VIDEO))
+
+        again, is_new = run(q.enqueue(VIDEO))
+
+        assert again.job_id == first.job_id
+        assert not is_new
+
+    def test_a_retry_does_not_count(self, redis):
+        q = ExtractionQueue(redis=redis, daily_limit=1)
+        run(q.enqueue(VIDEO))
+        job = run(q.claim())
+
+        retried, will_retry = run(q.fail(job, "llm_unavailable", "503"))
+
+        assert will_retry
+        assert retried.state is JobState.QUEUED
+
+    def test_the_counter_does_not_outlive_the_day_by_much(self, redis):
+        q = ExtractionQueue(redis=redis)
+        run(q.enqueue(VIDEO))
+
+        budget_ttls = [ttl for key, ttl in redis.ttls.items() if key.startswith("mise:budget:")]
+
+        assert budget_ttls == [48 * 3600]
+
+
 class TestAbandonedJobs:
     """An instance can die mid-job, and nothing else will ever finish it.
 
@@ -377,6 +436,6 @@ class TestJobRecords:
     def test_job_ids_are_unique_under_rapid_creation(self, redis):
         # A cap of 100 is the production default, so raise it here rather than
         # testing fewer ids — collisions are likeliest under rapid creation.
-        q = ExtractionQueue(redis=redis, max_depth=10_000)
+        q = ExtractionQueue(redis=redis, max_depth=10_000, daily_limit=10_000)
         ids = {run(q.enqueue(f"v{i:010d}"[:11]))[0].job_id for i in range(500)}
         assert len(ids) == 500

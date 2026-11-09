@@ -91,6 +91,13 @@ resource "google_cloud_run_v2_service" "extractor" {
         value = var.gemini_api_key
       }
 
+      // Required on Extract, the one RPC that spends money. The reads stay open
+      // so the canary needs no secret.
+      env {
+        name  = "EXTRACT_TOKEN"
+        value = var.extract_token
+      }
+
       // The worker pool has no queue without this, and app/server.py refuses to
       // boot rather than coming up healthy and failing every extraction.
       env {
@@ -173,8 +180,9 @@ resource "google_cloud_run_v2_service" "extractor" {
   depends_on = [google_project_service.run]
 }
 
-// Public invocation. The BFF calls this from Vercel, and locking it to a
-// caller identity is a Phase 6 job alongside auth.
+// Public invocation, because the BFF calls this from Vercel and the canary from
+// GitHub. Cloud Run IAM is therefore not the boundary: EXTRACT_TOKEN protects the
+// RPC that spends money, and the other RPCs only read.
 resource "google_cloud_run_v2_service_iam_member" "public" {
   project  = var.gcp_project_id
   location = google_cloud_run_v2_service.extractor.location
