@@ -76,6 +76,7 @@ export TF_VAR_vercel_api_token=...
 export TF_VAR_youtube_api_key=...
 export TF_VAR_gemini_api_key=...
 export TF_VAR_grafana_cloud_access_policy_token=...
+export TF_VAR_extract_token="$(openssl rand -hex 32)"   # first apply only
 
 cp terraform.tfvars.example terraform.tfvars   # non-secret values only
 
@@ -174,13 +175,13 @@ anywhere.
 Move to a remote backend before CI ever applies.
 
 There is a second consequence, found the hard way on 2026-10-20: state is not
-merely a convenience, it is the **only copy** of some of these values.
-`auth_secret` exists nowhere else — no console reissues it, and generating a
-fresh one invalidates every signed-in session. Losing this file is a recovery
+merely a convenience, it is the **only readable copy** of some of these values.
+Vercel stores `auth_secret` write-only and no console reissues it, so generating
+a fresh one invalidates every signed-in session. Losing this file is a recovery
 operation, not an inconvenience.
 
 The same day proved it cuts the other way too. `infra/load-state-vars.sh`
-restores the eight `TF_VAR_*` values that state already holds, so a shell that
+restores the `TF_VAR_*` values that state already holds, so a shell that
 has lost its exports does not have to go hunting through five consoles:
 
 ```bash
@@ -236,9 +237,10 @@ terraform -chdir=infra apply
 SNS email subscriptions need confirming — check your inbox after the first
 apply, or the alarm fires into nothing.
 
-**The region is `us-east-2` and is not negotiable.** This AWS account belongs to
-an organization it does not control, and that organization's service control
-policy denies regional services everywhere else. The first apply ran at the
+**The region is `us-east-2`.** This AWS account belongs to an organization it
+does not control, and that organization's service control policy restricts
+regions. `us-east-2` works and `us-east-1` does not; others are untested. The
+first apply ran at the
 then-default `us-east-1` and failed with
 
 ```

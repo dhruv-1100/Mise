@@ -10,8 +10,8 @@
 # from an apply that looked routine.
 #
 # Everything below is a resource attribute, so it already sits in
-# terraform.tfstate in plaintext. auth_secret in particular exists nowhere else:
-# no console can reissue it, and a fresh one invalidates every live session.
+# terraform.tfstate in plaintext. This is the only readable copy of auth_secret:
+# Vercel stores it write-only, and a fresh one invalidates every live session.
 #
 # Provider credentials (neon_api_key, upstash_email, upstash_api_key,
 # vercel_api_token, grafana_cloud_access_policy_token) are deliberately absent.

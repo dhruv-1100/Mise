@@ -45,9 +45,7 @@ and cook from with timers.
   twice sent the live page to 404 for a recipe already extracted correctly. S3
   is the copy that does not expire, reached by federating the service's own GCP
   identity into an AWS role — no access key exists anywhere. See
-  [ADR 0007](docs/adr/0007-recipe-archive.md). *This did not work for the first
-  day of its life and nothing noticed; the correction is the second 2026-10-20
-  entry in [`docs/INCIDENTS.md`](docs/INCIDENTS.md).*
+  [ADR 0007](docs/adr/0007-recipe-archive.md).
 - **Accounts.** Google OAuth2, JWT sessions over database users, RBAC. Save
   recipes, keep notes, count cooks. Verified creators can correct extractions of
   their own videos; anyone can keep their own edited version of any recipe.
@@ -100,6 +98,7 @@ proxy.
 | Tier | Holds | Lifetime |
 | --- | --- | --- |
 | Redis `mise:cache:*` | extracted recipes | 7 days; 6 hours for "no recipe here" |
+| Redis `mise:budget:*` | new extractions counted per UTC day | 48 hours |
 | Redis `mise:job:*` | job records | 24 hours |
 | Redis `mise:queue` / `mise:dlq` | pending and dead-lettered work | until drained |
 | S3 `recipes/*.json` | durable recipe copies | indefinite; 30-day noncurrent version expiry |
@@ -125,11 +124,11 @@ has no accounts and no queue. Both come from `terraform -chdir=infra output`.
 | Command | What it does |
 | --- | --- |
 | `pnpm dev` | Next.js dev server on :3000 |
-| `pnpm test` | vitest — 216 tests; fails if scaling drops below 100% branches |
-| `pnpm --filter @mise/web e2e` | Playwright — 32 tests across mobile and desktop |
+| `pnpm test` | vitest — 221 tests; fails if scaling drops below 100% branches |
+| `pnpm --filter @mise/web e2e` | Playwright — 42 tests across mobile and desktop |
 | `pnpm lint` / `pnpm typecheck` | across all workspaces |
 | `pnpm --filter @mise/web migrate` | apply `apps/extractor/migrations/*.sql` (`--dry` to list) |
-| `uv run pytest` | extractor — 430 tests (from `apps/extractor`) |
+| `uv run pytest` | extractor — 454 tests (from `apps/extractor`) |
 | `./scripts/codegen.sh` | regenerate gRPC stubs after editing the proto |
 
 ## Configuration
@@ -144,6 +143,7 @@ Terraform owns every production value — see [`infra/README.md`](infra/README.m
 | `YOUTUBE_API_KEY` | yes | video metadata and descriptions |
 | `GEMINI_API_KEY` | yes | extraction, including the video fallback |
 | `REDIS_URL` | yes | queue, job records, recipe cache |
+| `EXTRACT_TOKEN` | yes | shared secret required on the `Extract` RPC |
 | `PORT` | injected | gRPC bind port; set by Cloud Run |
 | `RECIPE_BUCKET` | no | S3 archive bucket |
 | `AWS_ROLE_ARN` | no | role federated into from the GCP identity |
@@ -163,6 +163,7 @@ inexplicable 404.
 | --- | --- | --- |
 | `DATABASE_URL` | yes | Neon, pooled, over HTTPS |
 | `EXTRACTOR_GRPC_ADDRESS` | yes | `host:443` of the Cloud Run service |
+| `EXTRACT_TOKEN` | yes | presented on `Extract`; same value as the extractor's |
 | `AUTH_SECRET` | for accounts | Auth.js JWT signing |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | for accounts | Google OAuth client |
 | `AUTH_TRUST_HOST` | yes | `true` behind Vercel's proxy |
@@ -194,8 +195,8 @@ because the read path falls through to S3 by design.
   than failing, and an apply from a shell that has lost its exports **destroys**
   the Vercel environment variables and breaks sign-in with no error. Use
   `plan -out`, confirm `0 to destroy`, then apply the saved file.
-  `source infra/load-state-vars.sh` restores the nine values Terraform already
-  holds in state.
+  `source infra/load-state-vars.sh` restores the values Terraform already holds
+  in state.
 
 ## Operations
 
@@ -203,8 +204,9 @@ because the read path falls through to S3 by design.
 
 | What | How | Where |
 | --- | --- | --- |
-| Extractor availability | [`canary.yml`](.github/workflows/canary.yml) — one real RPC daily at 06:17 UTC | GitHub Actions |
+| Extractor availability | [`canary.yml`](.github/workflows/canary.yml) — real RPCs daily, usually between 11:00 and 16:30 UTC | GitHub Actions |
 | Dead-letter queue depth | `DeadLetterDepth` → CloudWatch alarm → SNS email | AWS, `us-east-2` |
+| Federation to AWS | `DeadLetterDepth` silent for two days → CloudWatch alarm → SNS email | AWS, `us-east-2` |
 | Deploy health | `smoke_grpc.py` as the last deploy step | GitHub Actions |
 
 The canary is doing two jobs. Upstash deletes a free-tier Redis database after
@@ -214,10 +216,14 @@ the thing it alarms on. It is not absolute: GitHub disables scheduled workflows
 in a repository with no pushes for 60 days.
 
 **Not monitored, and worth knowing:** the web app's uptime, Neon, extraction
-latency, error rates, and — most sharply — AWS federation failures, which are
-silent because `treat_missing_data = "notBreaching"` is correct for the DLQ
-alarm but means a publisher that cannot authenticate triggers nothing. Phase 7
-brings Prometheus and Grafana.
+latency and error rates. Phase 7 brings Prometheus and Grafana.
+
+### Limits
+
+`Extract` requires `EXTRACT_TOKEN`, so only the BFF can queue work. The form in
+front of it is public, so new extractions are capped at 100 per UTC day. Cached
+recipes, work already in flight and retries do not count. There is no per-IP
+limit, so one person can spend the whole day's allowance.
 
 ### Degradation
 
@@ -226,10 +232,13 @@ hope:
 
 | Dependency | Behaviour | User impact |
 | --- | --- | --- |
-| **Redis** unreachable | reads fall through to S3; writes fail loudly | existing recipes still serve; new extractions refused |
+| **Redis** unreachable | reads fall through to S3; writes fail loudly; workers retry every 5 seconds and resume on their own | archived recipes still serve; new extractions refused |
+| **Instance dies mid-job** | job stays `RUNNING` until its 15-minute lease lapses, then the next submission of that video re-queues it | that video waits up to 15 minutes |
 | **S3** unreachable | logged warning, nothing else | none now; cache-expired recipes need re-extraction later |
 | **Gemini** failing | 3 attempts with backoff, then dead-letter | extraction fails; alarm fires |
-| **YouTube API** failing | job fails and retries | extraction fails |
+| **YouTube API** failing | job fails and retries, then dead-letters | extraction fails; alarm fires |
+| **Video deleted or private** | job fails at once, with no retry and no dead letter | the page says the video could not be found |
+| **Extractor** unreachable | pages render the error boundary; API routes return a 503 envelope | no false 404s |
 | **Neon** unreachable | account routes fail | recipes still serve; no sign-in, saves or edits |
 | **Queue at 100 jobs** | enqueue returns 429 | new submissions refused until drained |
 
@@ -278,7 +287,13 @@ variables. `source infra/load-state-vars.sh`, re-apply, then redeploy the web
 app so the build picks them up.
 
 **Dead-letter alarm fired.** Read the queue before clearing it — the DLQ is the
-only record of what failed.
+only record of what failed. Then do clear it: CloudWatch notifies on a transition,
+so the alarm cannot email again while the list stays non-empty.
+
+**Gauge-silent alarm fired.** `DeadLetterDepth` has stopped arriving, which almost
+always means federation is failing and recipes are not reaching S3 either. Follow
+"Recipes are not reaching S3" above. If the canary has also stopped, check that
+first, because the service only publishes while something wakes it.
 
 ### Rollback
 
@@ -303,13 +318,9 @@ Stated plainly, because a README that only lists what works is marketing.
   12–90s for the description path, and about 28s more when it falls back to
   watching the video. The 60s target in [`docs/METRICS.md`](docs/METRICS.md) is
   missed by the slow half.
-- **Observability is three checks, not a system.** No Prometheus, no tracing, no
+- **Observability is four checks, not a system.** No Prometheus, no tracing, no
   dashboards — Phase 7. A 149.8s description stage was observed once and nothing
   currently explains it.
-- **A federation failure is silent.** Covered under
-  [Monitoring](#monitoring); the fix is a second CloudWatch alarm on
-  `DeadLetterDepth` having no datapoints in 24h, which only became sound once
-  the canary guaranteed daily traffic.
 - **Entity resolution and the sanity-rule validator** from Phase 2.3 are not
   built.
 
@@ -341,4 +352,4 @@ glossed.
 
 Every outage and every bug that reached a user is in
 [`docs/INCIDENTS.md`](docs/INCIDENTS.md), including the two from 2026-10-20 that
-produced most of the Operations section above.
+produced much of the Operations section above.

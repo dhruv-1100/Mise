@@ -159,9 +159,8 @@ class TestRedisUnreachable:
         archive = FakeArchive({VIDEO: RECIPE})
         q = ExtractionQueue(redis=BrokenRedis(), archive=archive)
 
-        # Before the guard this raised ConnectionError out of the servicer and
-        # the archive was never consulted, so a recipe sitting safely in S3 was
-        # unreachable for the whole outage.
+        # Without the guard this raises ConnectionError out of the servicer and
+        # the archive is never consulted.
         assert run(q.cached_recipe(VIDEO))["title"] == "Archived"
         assert archive.reads == [VIDEO]
 

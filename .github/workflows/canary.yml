@@ -7,8 +7,9 @@ name: Canary
 # free-tier Redis database after fourteen days without traffic, and Mise is a
 # portfolio project that routinely goes a fortnight between visits. The database
 # was archived, the endpoint stopped resolving, and every queue-backed call
-# failed. It surfaced only because a human opened the site — Health kept
-# returning `ok` the whole time, correctly, since it is liveness-only by design.
+# failed. It surfaced only because an unrelated `terraform plan` failed on it.
+# Health kept returning `ok` the whole time, correctly, since it is
+# liveness-only by design.
 #
 # One real RPC a day is enough to reset that fourteen-day clock, and it fails
 # loudly the day anything else breaks. See docs/INCIDENTS.md.
@@ -22,6 +23,7 @@ on:
   schedule:
     # Daily. The window to defend is fourteen days, so this spends ~30 minutes
     # of Actions time a month to get fourteen independent chances to notice.
+    # GitHub starts these late: observed between 11:05 and 16:25 UTC.
     - cron: "17 6 * * *"
   workflow_dispatch:
 

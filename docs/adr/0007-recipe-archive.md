@@ -125,27 +125,22 @@ datapoint, and treating missing data as a breach would page on an idle service.
 ## Addendum, 2026-10-20 — the scope was too narrow
 
 This ADR scoped the archive to cache *expiry*: a recipe aging out of a Redis
-that is otherwise healthy. Four days after it was written, Upstash deleted the
-free-tier database for fourteen days of inactivity and the distinction turned
-out to matter enormously.
+that is otherwise healthy. The same day it was written, Upstash turned out to
+have deleted the free-tier database for fourteen days of inactivity, and the
+distinction turned out to matter.
 
 `cached_recipe` read Redis unguarded before falling through, so an unreachable
-database raised `ConnectionError` out of the servicer and the archive was never
-consulted.
+database would have raised `ConnectionError` out of the servicer with the archive
+never consulted.
 
-**Correction, written later the same day.** The paragraph that stood here said
-the recipes were "sitting durably in S3" and called the tier "present, correct,
-and bypassed". None of that was true. The bucket was empty. The federation
-described below under *Federation, not keys* had never once succeeded, and the
-archive had written nothing since the day it shipped — see the second
-2026-10-20 entry in `docs/INCIDENTS.md`. The tier was present, misconfigured,
-and silent.
-
-That correction is left visible rather than edited away, because the mistake is
-instructive: the addendum above was written from the code and the design, both
-of which were sound, without checking the bucket. `scripts/verify_aws.py` was
-sitting in the repository, written for exactly this, unrun. Reasoning about
-infrastructure is not evidence about infrastructure.
+**Correction, 2026-11-09.** Earlier versions of this addendum said recipes were
+sitting in S3 during that outage, and then that the archive "had never once
+succeeded" with `verify_aws.py` left unrun. Both were written from an impression
+of the day rather than from the record. This ADR, the code and the script landed
+together in `9b1c461`, and the AWS resources did not exist until the apply that
+recovered from the outage. The bucket was empty because it was new. The
+federation bug described below lived for 24 minutes, and `verify_aws.py` is what
+found it.
 
 Both Redis calls in the read path are now guarded, and the guarantee is wider
 than it was: **a dead cache degrades to slower, not to down.** Reads fall
@@ -171,8 +166,8 @@ Two things follow that were not obvious when this was written:
 ## Addendum, 2026-10-20 — region is a constraint, not a choice
 
 `var.aws_region` now defaults to `us-east-2`. The AWS account is a member of an
-organization it does not control, whose service control policy denies regional
-services everywhere else; an apply at the previous `us-east-1` default failed
+organization it does not control, whose service control policy restricts
+regions; an apply at the previous `us-east-1` default failed
 with an explicit SCP deny on `s3:CreateBucket` and `SNS:CreateTopic` while the
 IAM role in the same run succeeded, IAM being global.
 
@@ -202,3 +197,20 @@ mention of which claim, which condition or what value it compared, so a trust
 policy that is one key away from correct is indistinguishable from a missing
 permission. Anyone debugging this will reasonably start with IAM grants, and
 they will be looking in the wrong place.
+
+## Addendum, 2026-11-09 — what the archive holds, and who reads it
+
+An audit found three places where the code did not deliver what this ADR says.
+
+- **Only recipes are archived now.** "No recipe here" verdicts were stored too,
+  so the read path restored them after every expiry and defeated the six-hour
+  limit from ADR 0006. A verdict is a statement about what this pipeline managed
+  on one day, and it does not belong in a durable tier.
+- **`enqueue` reads through the archive.** It checked Redis alone, so the promise
+  at the top of `app/archive.py`, one GET instead of a re-extraction, held for the
+  recipe page and not for someone pasting the link.
+- **The role has `s3:ListBucket`.** Without it S3 answers 403 for a missing key.
+  Every ordinary miss logged `AccessDenied`, which made the real failure
+  indistinguishable from the daily canary. The original reasoning, that the
+  service has no need to enumerate the archive, is still true and turned out not
+  to be the only thing the permission does.

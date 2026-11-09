@@ -126,3 +126,20 @@ live possibility when this was written, and none is visible from a green deploy.
 - Terraform owns the service's configuration and CI owns only its image. The
   `lifecycle { ignore_changes = [image] }` block is what keeps `terraform apply`
   from rolling production back, and it must stay.
+
+## Addendum, 2026-11-09
+
+**"Late, not lost" holds only while the instance lives.** A throttled instance
+resumes its job when a request wakes it. An instance that has been shut down
+cannot, and the job's record stayed RUNNING with every resubmission handed the
+same dead job for 24 hours. A comment in `server.py` said a lease covered this,
+and no lease existed. `enqueue` now reclaims a RUNNING job after
+`JOB_LEASE_SECONDS`, through the normal retry path so a video that keeps killing
+its worker still dead-letters. Recovery happens when someone next submits the
+video; nothing sweeps for abandoned jobs in the background.
+
+**The service stays public, with a token on `Extract`.** The BFF calls it from
+Vercel and the canary from GitHub, so Cloud Run IAM is not the boundary. `Extract`
+is the one RPC that spends money and requires `EXTRACT_TOKEN`. The reads stay
+open, which keeps the canary free of secrets. A daily cap on new extractions
+covers the public form, which the token cannot.

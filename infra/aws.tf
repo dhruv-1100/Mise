@@ -81,7 +81,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "recipes" {
 // so registering it would fail as a duplicate. The condition keys below
 // (accounts.google.com:oaud / :sub) are the ones AWS exposes for it — note
 // `oaud` rather than the `aud` you would expect; see the comment on that
-// condition, which cost an afternoon.
+// condition.
 //
 // `sub` is the Cloud Run service account's numeric unique id, not its email.
 // Pinning the email instead would be a trust policy that silently widens if the
@@ -106,8 +106,8 @@ data "aws_iam_policy_document" "extractor_trust" {
     // for. A token minted for anything else will not satisfy this, which is
     // what stops a token issued for some other purpose being replayed here.
     //
-    // `oaud`, NOT `aud`. This was `aud` until 2026-10-20 and every federation
-    // attempt failed with a bare "Not authorized to perform
+    // `oaud`, NOT `aud`. This was `aud` on the first rollout, and every
+    // federation attempt failed with a bare "Not authorized to perform
     // sts:AssumeRoleWithWebIdentity" — an error that names no claim and no
     // condition, so it reads like a missing permission rather than a mismatched
     // string. For the built-in accounts.google.com provider AWS maps:

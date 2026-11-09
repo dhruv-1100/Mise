@@ -35,18 +35,18 @@ but has never measured.
 database after 14 days without traffic and production was hard-down for an
 unknown period, because nothing was watching; `.github/workflows/canary.yml` now
 probes production daily, which is both the alarm and the traffic that prevents a
-recurrence. Separately, the S3 archive had **never once worked** — the IAM trust
-policy pinned `accounts.google.com:aud` where AWS requires `:oaud`, so every
-federation attempt was rejected and the bucket sat empty from the day it
-shipped, while ADR 0007 described the mechanism as working. Both are fixed and
-verified in production, writes and reads.
+recurrence. Separately, the AWS role was rejected on its first rollout, because
+the IAM trust policy pinned `accounts.google.com:aud` where AWS requires `:oaud`.
+`scripts/verify_aws.py` caught it on the first extraction, it was fixed 24 minutes
+after the first failure, and both writes and reads are verified in production.
 
-The lesson those two share is worth carrying into any session here: in this
-codebase, failures tend to be *silent*. Best-effort error handling, Terraform
-variables defaulting to `""`, and a deliberately liveness-only health check each
-convert a failure into a non-event. Prefer checking the thing over reasoning
-about the thing — `scripts/verify_aws.py` existed for months and would have
-caught the second incident on day one, unrun.
+The lesson worth carrying into any session here: in this codebase, failures tend
+to be *silent*. Best-effort error handling, Terraform variables defaulting to
+`""`, and a deliberately liveness-only health check each convert a failure into a
+non-event. Prefer checking the thing over reasoning about the thing, and that
+includes history: check git and the logs before writing down when or how long
+something happened. An earlier version of this paragraph said `verify_aws.py` had
+sat unrun for months. It was a few hours old and it was the thing that worked.
 
 The headline research finding remains `docs/adr/0001-content-sourcing.md` —
 captions are unreachable without creator OAuth, so descriptions are the primary
@@ -70,11 +70,12 @@ source. See `BUILD_PLAN.md` for all 12 phases.
   the video itself when the description has no recipe, see ADR 0006),
   `units.py` (canonical
   grams/ml), `evaluation.py` (scoring against ground truth), `queue.py`
-  (Redis-backed jobs: idempotency, retry/DLQ, cache, backpressure),
+  (Redis-backed jobs: idempotency, retry/DLQ, cache, backpressure, a lease for
+  jobs whose instance died, a daily cap on new extractions),
   `worker.py` (drains the queue), `grpc_server.py` (the BFF-facing surface),
   `archive.py` (S3 as the durable tier under the Redis cache — ADR 0007;
-  best-effort by design, so its failures are a log line and nothing else,
-  which is exactly how it stayed broken for its whole first day),
+  best-effort by design, so inside the service its failures are only a log
+  line; the `dead-letter-gauge-silent` alarm is what notices),
   `metrics.py` (publishes dead-letter depth to CloudWatch, where an SNS alarm
   watches it).
   `server.py` is the production entrypoint and the only thing that starts those
@@ -109,10 +110,14 @@ source. See `BUILD_PLAN.md` for all 12 phases.
   an apply from a shell that has lost its exports destroys the Vercel
   environment variables and breaks sign-in, with no error. `plan -out`, confirm
   `0 to destroy`, then apply the saved file. `source infra/load-state-vars.sh`
-  restores the nine values Terraform already holds in state, including
-  `auth_secret`, which exists nowhere else on earth. `var.aws_region` must stay
-  `us-east-2`: the AWS account belongs to an organization whose service control
-  policy denies regional services anywhere else.
+  restores the values Terraform already holds in state, including `auth_secret`,
+  whose only readable copy is there. `var.aws_region` must stay `us-east-2`: the
+  AWS account belongs to an organization whose service control policy restricts
+  regions, and `us-east-1` is denied.
+
+  `Extract` is the only RPC that needs a caller identity: the service is public
+  on Cloud Run and `EXTRACT_TOKEN`, shared with the BFF, protects the one call
+  that spends money. The reads stay open so the canary needs no secret.
 
 Accounts live entirely in `apps/web`: `auth.ts` (Auth.js v5, Google, JWT
 sessions over database users), `lib/db.ts` (Neon over HTTPS — no ORM, hand
@@ -224,9 +229,8 @@ gcloud run services update-traffic mise-prod-extractor --to-revisions=PREVIOUS=1
 
 # Prove the AWS tier works. Needs YOUR credentials, not the service's — it has
 # none. The federation only happens inside Cloud Run, so this checks the result
-# rather than the mechanism. RUN IT after any change to infra/aws.tf: it is the
-# only thing that distinguishes a working archive from a silent one, and it sat
-# unrun while the archive was completely non-functional.
+# rather than the mechanism. RUN IT after any change to infra/aws.tf: it caught
+# the rejected trust policy on the first rollout.
 cd apps/extractor
 uv run --frozen python scripts/verify_aws.py VIDEO_ID
 ```
@@ -257,8 +261,8 @@ uv run --frozen python scripts/verify_aws.py VIDEO_ID
   fresh codegen output, so a formatter rewriting a stub would fail that check
   on every run with no way to fix it.
 - `apps/web` — vitest for logic that fails silently (the migration splitter, the
-  open-redirect guard, the analytics contract); Playwright for cook-mode flows,
-  still outstanding. Don't unit test React.
+  open-redirect guard, the analytics contract); Playwright for the recipe page,
+  cook mode and the error boundaries. Don't unit test React.
 - **Hydration is not covered by any of the above.** A `<Suspense>` boundary
   around an async server component left its client children rendered, correct
   looking and completely inert — no handlers attached — in both dev and a
@@ -290,7 +294,7 @@ uv run --frozen python scripts/verify_aws.py VIDEO_ID
 ## Known deviations from BUILD_PLAN.md
 
 - **Next 15, not 16.** `create-next-app@latest` now ships Next 16.3.1; pinned to
-  15.5.23 to match the plan. Bumping to 16 lets `apps/web/eslint.config.mjs`
+  the 15.5 line (15.5.29) to match the plan. Bumping to 16 lets `apps/web/eslint.config.mjs`
   drop its `FlatCompat` shim.
 - **Node 20 is EOL.** Next 15 supports it, but Phase 1 should move to Node 22
   LTS before CI is pinned to a version.

@@ -284,10 +284,9 @@ variable "aws_region" {
   description = "AWS region for the recipe archive and CloudWatch alarm."
   type        = string
 
-  // us-east-2 is not a preference, it is the only region that works. This AWS
+  // us-east-2 is not a preference, it is the region known to work. This AWS
   // account is a member of an organization it does not control, and that
-  // organization's service control policy denies regional services outside
-  // us-east-2. On 2026-10-20 an apply at the default us-east-1 failed with
+  // organization's service control policy restricts regions. On 2026-10-20 an apply at the default us-east-1 failed with
   //
   //   AccessDenied ... with an explicit deny in a service control policy
   //

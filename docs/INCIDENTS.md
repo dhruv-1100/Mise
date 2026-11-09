@@ -155,11 +155,11 @@ Two secondary findings, both worse than the cause:
    liveness only, so an orchestrator cannot restart a healthy service because
    Redis is slow (`extractor.proto`). The design is right. The gap was that
    nothing *else* ever asked a question whose answer depended on Redis.
-2. **The S3 archive would not have helped.** ADR 0007 scoped it to cache
-   *expiry*, and `cached_recipe` read Redis unguarded before falling through.
-   A `ConnectionError` propagated out of the servicer, so recipes sitting safely
-   in S3 were unreachable for the entire outage. The durable tier was present,
-   correct, and bypassed.
+2. **The S3 archive would not have helped, had it existed.** Its AWS resources
+   had not been applied yet; the plan that exposed this outage was the one
+   creating them. But ADR 0007 scoped it to cache *expiry*, and `cached_recipe`
+   read Redis unguarded before falling through, so a `ConnectionError` would
+   have left the servicer without the archive ever being consulted.
 
 **Fix:** Database recreated through Terraform. The provider 404s on a missing
 resource instead of planning a replacement, so recovery needed
@@ -195,23 +195,23 @@ server backed by a failing Redis — exit 1 — and a working one — exit 0.
 
 ---
 
-## 2026-10-20 — the recipe archive had never worked, and nothing could tell
+## 2026-10-20 — AWS federation rejected on first rollout, caught by the verification script
 
-**Impact:** No durable copy of any recipe existed between the archive shipping
-(2026-10-19) and this fix. The S3 bucket was empty from creation. Every 404 that
-ADR 0007 was written to prevent was still fully possible the whole time, and the
-Redis deletion earlier the same day would have destroyed every extracted recipe
-with no recovery — which is precisely the scenario the archive was built for.
+*Corrected 2026-11-09. This entry first claimed the archive had "never worked"
+since shipping on 2026-10-19, that `verify_aws.py` had sat unrun, and that
+several hours went on IAM permissions. Git history and the service logs show
+none of that. The code, the Terraform and the script all landed in `9b1c461` the
+same morning, and the times below come from the logs.*
 
-The dead-letter alarm was equally inert: `metrics.py` could not publish, so
-`DeadLetterDepth` reached CloudWatch zero times and the alarm sat in
-`INSUFFICIENT_DATA` with `treat_missing_data = "notBreaching"`.
+**Impact:** None on users. From the first revision configured for AWS
+(09:12 UTC) until the fix (09:36 UTC) the extractor could not assume its role.
+One recipe (`Gbuse4WX01I`) stayed in Redis without reaching S3, and
+`DeadLetterDepth` was not published.
 
-**Detected by:** Running `scripts/verify_aws.py` for the first time, during
-recovery from the Redis outage above. The script was written alongside the
-archive specifically to catch this class of problem and had never been run —
-the second time in this repository that verification was written down and not
-performed (see 2026-08-28), and the first time it would have caught something.
+**Detected by:** `scripts/verify_aws.py`, run on the first video extracted after
+the AWS resources existed. It reported the object missing, and the Cloud Run
+logs supplied the `AccessDenied`. This is the script doing what it was written
+for.
 
 **Root cause:** The IAM trust policy pinned the wrong condition key. For the
 built-in `accounts.google.com` provider, AWS maps:
@@ -223,45 +223,24 @@ accounts.google.com:aud   -> the token's `azp` claim when present,
 ```
 
 Google service account identity tokens carry `azp`, set to the account's numeric
-unique id. The policy required `accounts.google.com:aud` to equal
-`mise-extractor-aws`, so AWS was comparing `116924920265042331650` against that
-string. It could never match.
+unique id, so the policy's `:aud` condition could never equal
+`mise-extractor-aws`. AWS reports this as `Not authorized to perform
+sts:AssumeRoleWithWebIdentity`, naming no claim and no condition, which reads
+like a missing IAM permission.
 
-The error AWS returns for this is `AccessDenied: Not authorized to perform
-sts:AssumeRoleWithWebIdentity` — naming no claim, no condition and no value, so
-it reads like a missing IAM permission rather than a failed string comparison.
-Several hours went into permissions that were already correct.
+**Fix:** `accounts.google.com:oaud`, which is right whether or not `azp` is
+present. Confirmed in production: the role was assumed at 09:36:11,
+`DeadLetterDepth` began publishing, the alarm moved to `OK`, and
+`recipes/r4saZD0J_gU.json` reached the bucket at 09:40:38. The read path was then
+proven by deleting that recipe's cache key and serving it back from S3.
 
-**Fix:** `accounts.google.com:oaud`, which maps to `aud` unconditionally and is
-therefore right whether or not `azp` is present. Confirmed in production: the
-role is assumed, `DeadLetterDepth` is publishing, the alarm moved to `OK`, and
-`recipes/r4saZD0J_gU.json` is in the bucket.
+**Prevention:** `archive.put` is best-effort, correctly, because a durable copy
+failing to land must not fail an extraction that already succeeded. That leaves a
+`WARNING` as the only signal in the service itself. The
+`dead-letter-gauge-silent` alarm now fires if the gauge stops arriving for two
+days, which is sound only because the canary guarantees daily traffic. The role
+also gained `s3:ListBucket`, so an ordinary miss is a 404 and an `AccessDenied`
+in the logs means something again.
 
-**Prevention:** This is the uncomfortable one, because the honest answer is
-*not much yet*.
-
-`archive.put` is best-effort and swallows its own errors — deliberately, and
-still correctly: a durable copy failing to land must not fail an extraction that
-already succeeded. But that design made a completely non-functional subsystem
-indistinguishable from a working one at every level except a `WARNING` in logs
-nobody reads. Correct error handling and zero observability compose into
-something worse than either.
-
-What exists now is partial. The daily canary guarantees the service runs at
-least once every 24 hours, and a running service publishes `DeadLetterDepth`
-within 60 seconds. That makes *absence* of the metric meaningful for the first
-time — before the canary, missing data genuinely meant "scaled to zero".
-
-**Open:**
-
-- **A federation failure is still silent.** `treat_missing_data = "notBreaching"`
-  is right for the DLQ alarm but means a publisher that cannot authenticate
-  triggers nothing. The fix is a second alarm on `DeadLetterDepth` having no
-  datapoints in 24h, which is only sound because the canary now guarantees
-  daily traffic. Worth doing before Phase 7.
-- **Nothing counts archive write failures.** A Prometheus counter on
-  `archive.put` failures, due in Phase 7 anyway, would have made this visible
-  on day one.
-- **The read fallthrough has never been exercised against real S3.** It is
-  covered by tests using a fake archive, and the real path has now been proven
-  for writes only.
+**Open:** Nothing counts archive write failures directly. A Prometheus counter on
+`archive.put` belongs to Phase 7.
